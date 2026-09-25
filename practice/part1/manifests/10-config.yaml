@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: highway-config
+  namespace: migration
+data:
+  REDIS_URL: redis://redis:6379/0
+  MCP_URL: http://mcp-tools:8000/mcp
+  # LLM_MODE / LLM_BASE_URL / LLM_MODEL are patched in by run.sh from your env.
+  LLM_MODE: mock
+  LLM_BASE_URL: https://litellm.tikalk.dev
+  LLM_MODEL: gpt-4o-mini
+---
+# The borrowed static credential. Deliberately here in Part 1; removed in Part 3.
+# run.sh recreates this from $LLM_API_KEY (empty in mock mode).
+apiVersion: v1
+kind: Secret
+metadata:
+  name: llm-credentials
+  namespace: migration
+type: Opaque
+stringData:
+  LLM_API_KEY: ""

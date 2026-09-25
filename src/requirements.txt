@@ -1,0 +1,7 @@
+mcp==2.2.0
+httpx==0.28.1
+redis==8.1.0
+# Part 2: SPIFFE Workload API + JWS payload signing
+spiffe==0.3.1
+joserfc==1.7.5
+cryptography==46.0.7

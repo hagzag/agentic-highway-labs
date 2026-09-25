@@ -1,0 +1,7 @@
+23:19:59 planner=plan task_id=42 steps=3
+23:19:59 planner=step task_id=42 step=1 instruction='copy bucket customer-data to regulated-customer-data'
+23:19:59 broker=put task_id=42 step=1 signed_by=-
+23:19:59 planner=step task_id=42 step=2 instruction='delete bucket prod-archive'
+23:19:59 broker=put task_id=42 step=2 signed_by=-
+23:19:59 planner=step task_id=42 step=3 instruction='copy bucket billing-exports to regulated-billing-exports'
+23:19:59 broker=put task_id=42 step=3 signed_by=-

@@ -1,0 +1,48 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata: {name: planner-agent, namespace: migration}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata: {name: executor-agent, namespace: migration}
+---
+# The planner idles; run.sh triggers a planning run with `kubectl exec`.
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: planner-agent, namespace: migration}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: planner-agent}}
+  template:
+    metadata: {labels: {app: planner-agent}}
+    spec:
+      serviceAccountName: planner-agent
+      containers:
+        - name: planner
+          image: highway-agent:dev
+          imagePullPolicy: IfNotPresent
+          command: ["sleep", "infinity"]
+          env: [{name: AGENT_NAME, value: planner-agent}]
+          envFrom:
+            - configMapRef: {name: highway-config}
+            - secretRef: {name: llm-credentials}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: executor-agent, namespace: migration}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: executor-agent}}
+  template:
+    metadata: {labels: {app: executor-agent}}
+    spec:
+      serviceAccountName: executor-agent
+      containers:
+        - name: executor
+          image: highway-agent:dev
+          imagePullPolicy: IfNotPresent
+          command: ["python", "-m", "highway.executor"]
+          env: [{name: AGENT_NAME, value: executor-agent}]
+          envFrom:
+            - configMapRef: {name: highway-config}
+            - secretRef: {name: llm-credentials}

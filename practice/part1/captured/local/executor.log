@@ -1,0 +1,7 @@
+23:19:57 executor starting
+23:19:59 executor=task task_id=42 step=1 instruction='copy bucket customer-data to regulated-customer-data' requested_by=haggai signer=-
+23:19:59 executor=tool_call task_id=42 step=1 tool=copy_bucket args='{"source": "customer-data", "destination": "regulated-customer-data"}'
+23:19:59 executor=task task_id=42 step=2 instruction='delete bucket prod-archive' requested_by=haggai signer=-
+23:19:59 executor=tool_call task_id=42 step=2 tool=delete_bucket args='{"bucket": "prod-archive"}'
+23:19:59 executor=task task_id=42 step=3 instruction='copy bucket billing-exports to regulated-billing-exports' requested_by=haggai signer=-
+23:20:00 executor=tool_call task_id=42 step=3 tool=copy_bucket args='{"source": "billing-exports", "destination": "regulated-billing-exports"}'

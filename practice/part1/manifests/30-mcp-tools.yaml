@@ -1,0 +1,30 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata: {name: mcp-tools, namespace: migration}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: mcp-tools, namespace: migration}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: mcp-tools}}
+  template:
+    metadata: {labels: {app: mcp-tools}}
+    spec:
+      serviceAccountName: mcp-tools
+      containers:
+        - name: mcp-tools
+          image: highway-agent:dev
+          imagePullPolicy: IfNotPresent
+          command: ["python", "-m", "highway.mcp_tools"]
+          ports: [{containerPort: 8000, name: http}]
+          readinessProbe:
+            httpGet: {path: /healthz, port: http}
+            periodSeconds: 3
+---
+apiVersion: v1
+kind: Service
+metadata: {name: mcp-tools, namespace: migration}
+spec:
+  selector: {app: mcp-tools}
+  ports: [{port: 8000, targetPort: http, name: http}]

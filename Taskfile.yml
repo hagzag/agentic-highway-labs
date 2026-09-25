@@ -1,0 +1,40 @@
+# https://taskfile.dev
+version: "3"
+
+vars:
+  P1: ./practice/part1/run.sh
+  P2: ./practice/part2/run.sh
+
+tasks:
+  default:
+    cmds: [task --list]
+
+  # --- Part 1: The Safe Highway (Linkerd mTLS) ------------------------------
+  part1:up:      {desc: "k3d cluster + agents, no mesh", cmds: ["{{.P1}} up"]}
+  part1:sniff:   {desc: "tcpdump Redis while the planner queues a plan", cmds: ["{{.P1}} sniff"]}
+  part1:mesh:    {desc: "install Linkerd and inject every pod", cmds: ["{{.P1}} mesh"]}
+  part1:edges:   {desc: "linkerd viz edges: who talks to whom, with which identity", cmds: ["{{.P1}} edges"]}
+  part1:inject:  {desc: "poison the inventory; the authenticated executor deletes prod-archive", cmds: ["{{.P1}} inject"]}
+  part1:key:     {desc: "show the static LLM key every agent carries", cmds: ["{{.P1}} key"]}
+  part1:all:     {desc: "run Part 1 end to end", cmds: ["{{.P1}} all"]}
+  part1:capture: {desc: "run Part 1 and save output to practice/part1/captured/k3d", cmds: ["{{.P1}} capture"]}
+  part1:cleanup: {desc: "delete the migration namespace", cmds: ["./practice/part1/cleanup.sh"]}
+
+  # --- Part 2: License Plates (SPIRE + JWS-signed payloads) -----------------
+  part2:up:         {desc: "Part 1 road + SPIRE + registration entries", cmds: ["{{.P2}} up"]}
+  part2:svid:       {desc: "each workload asks SPIRE who it is", cmds: ["{{.P2}} svid"]}
+  part2:forge-open: {desc: "BREAK: rogue pod queues a task, executor obeys", cmds: ["{{.P2}} forge-open"]}
+  part2:sign:       {desc: "FIX: sign with X.509-SVID, verify against the SPIRE bundle", cmds: ["{{.P2}} sign"]}
+  part2:forge:      {desc: "rogue: unsigned + self-signed attempts are rejected", cmds: ["{{.P2}} forge"]}
+  part2:tamper:     {desc: "rogue rewrites signed tasks in the queue; rejected", cmds: ["{{.P2}} tamper"]}
+  part2:poison:     {desc: "BREAK AGAIN: a validly signed bad instruction still runs", cmds: ["{{.P2}} poison"]}
+  part2:all:        {desc: "run Part 2 end to end", cmds: ["{{.P2}} all"]}
+  part2:capture:    {desc: "run Part 2 and save output to practice/part2/captured/k3d", cmds: ["{{.P2}} capture"]}
+  part2:cleanup:    {desc: "delete SPIRE and the migration namespace", cmds: ["./practice/part2/cleanup.sh"]}
+
+  # --- Utilities ------------------------------------------------------------
+  image:  {desc: "build highway-agent:dev and import into k3d", cmds: ["bash -c 'source scripts/lib.sh && image_build'"]}
+  down:   {desc: "delete the k3d cluster", cmds: ["k3d cluster delete {{.CLUSTER | default \"highway\"}}"]}
+  smoke:
+    desc: "maintainers: run the agents as local processes (no cluster), mock LLM"
+    cmds: ["scripts/local-smoke.sh start", "echo 'running; stop with: scripts/local-smoke.sh stop'"]
