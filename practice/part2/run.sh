@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Part 2 — License Plates: SPIRE workload identity + JWS-signed payloads across Redis.
 #   ./run.sh            run every step
-#   ./run.sh <step>     up | svid | forge-open | sign | forge | tamper | poison | capture
+#   ./run.sh <step>     up | svid | forge-open | sign | forge | tamper | poison | capture | doctor
 source "$(dirname "$0")/../../scripts/lib.sh"
 HERE="$(cd "$(dirname "$0")" && pwd)"
 TD=highway.lab
@@ -21,16 +21,42 @@ up() {
   kubectl -n spire rollout status daemonset/spire-agent --timeout=180s >/dev/null
 
   say "Registering identities: node alias + one entry per agent"
-  SS entry create -node -spiffeID "spiffe://$TD/k8s-node" -selector k8s_psat:cluster:highway >/dev/null || true
+  SS entry create -node -spiffeID "spiffe://$TD/k8s-node" -selector k8s_psat:cluster:highway >/dev/null 2>&1 || true  # idempotent
   for sa in planner-agent executor-agent mcp-tools; do
     SS entry create -parentID "spiffe://$TD/k8s-node" -spiffeID "spiffe://$TD/ns/$NS/sa/$sa" \
-      -selector "k8s:ns:$NS" -selector "k8s:sa:$sa" >/dev/null || true
+      -selector "k8s:ns:$NS" -selector "k8s:sa:$sa" >/dev/null 2>&1 || true
   done
   SS entry show -selector k8s:ns:$NS | grep -E 'SPIFFE ID|Selector'
 
   say "Redeploying agents with the Workload API socket (signing OFF)"
   kubectl apply -f "$HERE/manifests/20-agents-spiffe.yaml" >/dev/null
   wait_ready
+  wait_svid
+}
+
+# Entries reach each node's agent on its next sync, so the first fetch can
+# return PERMISSION_DENIED for a few seconds. Wait instead of failing later.
+wait_svid() {
+  local py='from spiffe import WorkloadApiClient as W; W().fetch_x509_svid()'
+  for d in planner-agent executor-agent; do
+    for i in $(seq 30); do
+      exec_in "$d" python -c "$py" >/dev/null 2>&1 && { echo "$d: SVID issued"; break; }
+      [[ $i == 30 ]] && { echo "$d: no SVID after 60s, run: ./run.sh doctor"; return 1; }
+      sleep 2
+    done
+  done
+}
+
+doctor() {
+  say "Pods and nodes"
+  kubectl -n "$NS" get pods -o wide; kubectl -n spire get pods -o wide
+  say "Attested agents (expect one per k3d node)"
+  SS agent list
+  say "Registration entries"
+  SS entry show -selector "k8s:ns:$NS" | grep -E 'SPIFFE ID|Selector'
+  say "Agent log: attestation results"
+  kubectl -n spire logs daemonset/spire-agent --tail=300 --all-containers \
+    | grep -iE 'no identity|selectors|attest|error' | tail -20 || true
 }
 
 svid() {
@@ -48,10 +74,11 @@ except Exception as e:
 forge_open() {
   say "BREAK: signing is off. The rogue pod pushes a task straight into Redis"
   tools_admin reset >/dev/null
+  queue_flush
   kubectl -n "$NS" exec deploy/rogue -c rogue -- python -m highway.forge unsigned
   sleep 5
-  kubectl -n "$NS" logs deploy/executor-agent -c executor --since=15s | grep -E 'executor=(task|tool_call)'
-  kubectl -n "$NS" logs deploy/mcp-tools -c mcp-tools --since=15s | grep 'tool=delete_bucket'
+  applogs executor-agent executor 15 | grep -E 'executor=(task|tool_call)' || true
+  applogs mcp-tools mcp-tools 15 | grep 'tool=delete_bucket' || true
 }
 
 sign() {
@@ -61,9 +88,10 @@ sign() {
   kubectl -n "$NS" rollout restart deploy/planner-agent deploy/executor-agent >/dev/null
   wait_ready
   tools_admin reset >/dev/null
+  queue_flush
   plan 43
   sleep 5
-  kubectl -n "$NS" logs deploy/executor-agent -c executor --since=15s | grep -E 'executor='
+  applogs executor-agent executor 15 | grep -E 'executor=' || true
 }
 
 forge() {
@@ -71,7 +99,7 @@ forge() {
   kubectl -n "$NS" exec deploy/rogue -c rogue -- python -m highway.forge unsigned
   kubectl -n "$NS" exec deploy/rogue -c rogue -- python -m highway.forge self-signed
   sleep 5
-  kubectl -n "$NS" logs deploy/executor-agent -c executor --since=10s | grep REJECTED
+  applogs executor-agent executor 10 | grep REJECTED || true
 }
 
 tamper() {
@@ -82,7 +110,7 @@ tamper() {
   kubectl -n "$NS" exec deploy/rogue -c rogue -- python -m highway.forge tamper
   kubectl -n "$NS" scale deploy/executor-agent --replicas=1 >/dev/null
   wait_ready; sleep 8
-  kubectl -n "$NS" logs deploy/executor-agent -c executor | grep -E 'REJECTED|executor=task'
+  applogs executor-agent executor | grep -E 'REJECTED|executor=task' || true
 }
 
 poison() {
@@ -91,8 +119,8 @@ poison() {
   tools_admin poison >/dev/null
   plan 45
   sleep 6
-  kubectl -n "$NS" logs deploy/executor-agent -c executor --since=15s | grep -E 'executor=(task|tool_call)'
-  kubectl -n "$NS" logs deploy/mcp-tools -c mcp-tools --since=15s | grep 'tool=delete_bucket'
+  applogs executor-agent executor 15 | grep -E 'executor=(task|tool_call)' || true
+  applogs mcp-tools mcp-tools 15 | grep 'tool=delete_bucket' || true
   say "Valid signature. Right identity. Wrong decision. Identity is not permission (Part 3)."
 }
 
@@ -105,13 +133,13 @@ capture() {
   forge       2>&1 | tee "$out/04-forge.txt"
   tamper      2>&1 | tee "$out/05-tamper.txt"
   poison      2>&1 | tee "$out/06-poison.txt"
-  kubectl -n spire logs daemonset/spire-agent --tail=200 | grep -iE 'attest|svid' | tail -20 > "$out/spire-agent.log" || true
+  kubectl -n spire logs -l app=spire-agent --prefix --tail=200 | grep -iE 'attest|svid' | tail -20 > "$out/spire-agent.log" || true
   say "Captured to $out"
 }
 
 case "${1:-all}" in
   up) up ;; svid) svid ;; forge-open) forge_open ;; sign) sign ;; forge) forge ;;
-  tamper) tamper ;; poison) poison ;; capture) capture ;;
+  tamper) tamper ;; poison) poison ;; capture) capture ;; doctor) doctor ;;
   all) up; svid; forge_open; sign; forge; tamper; poison ;;
   *) echo "unknown step: $1"; exit 1 ;;
 esac

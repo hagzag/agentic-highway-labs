@@ -48,11 +48,6 @@ data:
           node_name_env = "MY_NODE_NAME"
         }
       }
-      WorkloadAPIServer "workload_api" {
-        plugin_data {
-          listen_addr = "unix:///run/spire/sockets/agent.sock"
-        }
-      }
     }
     health_checks {
       listener_enabled = true

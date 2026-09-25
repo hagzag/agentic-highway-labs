@@ -22,10 +22,10 @@ do_sniff() {
 }
 
 mesh() {
-  if ! command -v linkerd >/dev/null; then
+  export PATH="$HOME/.linkerd2/bin:$PATH"
+  if ! linkerd version --client --short 2>/dev/null | grep -q "$LINKERD2_VERSION"; then
     say "Installing linkerd CLI $LINKERD2_VERSION"
-    curl --proto '=https' --tlsv1.2 -sSfL https://run.linkerd.io/install-edge | sh
-    export PATH="$HOME/.linkerd2/bin:$PATH"
+    curl --proto '=https' --tlsv1.2 -sSfL https://run.linkerd.io/install-edge | sh >/dev/null
   fi
   say "Installing Gateway API $GATEWAY_API_VERSION CRDs (Linkerd needs them)"
   kubectl apply --server-side -f \
@@ -63,7 +63,7 @@ inject() {
   plan 42
   sleep 5
   say "mcp-tools log: every call authenticated, and the bucket is gone"
-  kubectl -n "$NS" logs deploy/mcp-tools -c mcp-tools --since=60s | grep 'tool='
+  applogs mcp-tools mcp-tools 60 | grep 'tool=' || true
 }
 
 key() {
@@ -83,8 +83,8 @@ capture() {
   say "Inside the pod, after the proxy (lo)"; sniff lo 2>&1 | tee "$out/05-sniff-inside-pod.txt"
   inject                      2>&1 | tee "$out/06-inject.txt"
   key                         2>&1 | tee "$out/07-static-key.txt"
-  kubectl -n "$NS" logs deploy/executor-agent -c executor > "$out/executor.log"
-  kubectl -n "$NS" logs deploy/mcp-tools -c mcp-tools     > "$out/mcp-tools.log"
+  applogs executor-agent executor > "$out/executor.log"
+  applogs mcp-tools mcp-tools > "$out/mcp-tools.log"
   say "Captured to $out"
 }
 

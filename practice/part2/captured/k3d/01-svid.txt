@@ -1,5 +1,5 @@
 
 [1;36m==> Each agent asks the local SPIRE agent: who am I?[0m
-planner-agent   FetchX509SvidError: no identity issued (StatusCode.PERMISSION_DENIED)
-executor-agent  FetchX509SvidError: no identity issued (StatusCode.PERMISSION_DENIED)
+planner-agent   spiffe://highway.lab/ns/migration/sa/planner-agent | expires 2026-09-25T05:46:50+00:00 | issuer 2.5.4.5=169667141434600507043815404060836084490,O=SPIFFE,C=US
+executor-agent  spiffe://highway.lab/ns/migration/sa/executor-agent | expires 2026-09-25T05:46:50+00:00 | issuer 2.5.4.5=169667141434600507043815404060836084490,O=SPIFFE,C=US
 rogue           FetchX509SvidError: no identity issued (StatusCode.PERMISSION_DENIED)

@@ -7,6 +7,8 @@ export CLUSTER="${CLUSTER:-highway}"
 export LINKERD2_VERSION="${LINKERD2_VERSION:-edge-26.9.3}"   # Linkerd OSS ships edge releases only
 export GATEWAY_API_VERSION="${GATEWAY_API_VERSION:-v1.5.1}" # Linkerd 2.20 accepts 1.2.1-1.5.1
 export SPIRE_VERSION="${SPIRE_VERSION:-1.15.3}"
+export KEYCLOAK_VERSION="${KEYCLOAK_VERSION:-26.7.4}"         # verified 2026-09-25
+export OPA_VERSION="${OPA_VERSION:-1.20.1}"                   # verified 2026-09-25
 export NETSHOOT_IMAGE="${NETSHOOT_IMAGE:-nicolaka/netshoot:latest}"
 export IMAGE="highway-agent:dev"
 export NS=migration
@@ -16,6 +18,9 @@ export LLM_MODE="${LLM_MODE:-mock}"                          # mock | live
 export LLM_BASE_URL="${LLM_BASE_URL:-https://litellm.tikalk.dev}"
 export LLM_MODEL="${LLM_MODEL:-gpt-4o-mini}"
 export LLM_API_KEY="${LLM_API_KEY:-}"
+
+# --- Part 3: the human who logs in (realm users: hagzag, tester, ops-admin) ---
+export LAB_USER="${LAB_USER:-tester}"
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 export REPO_ROOT
@@ -46,7 +51,31 @@ llm_config() {
     "{\"data\":{\"LLM_MODE\":\"$LLM_MODE\",\"LLM_BASE_URL\":\"$LLM_BASE_URL\",\"LLM_MODEL\":\"$LLM_MODEL\"}}" >/dev/null
 }
 
-wait_ready() { kubectl -n "$NS" rollout status deploy --timeout=180s >/dev/null; }
+# Rollout done AND old pods gone. A Terminating pod still runs its process:
+# an old executor would keep popping tasks from Redis during the next step.
+queue_flush() {  # drop leftovers from earlier steps/runs
+  kubectl -n "$NS" exec deploy/redis -c redis -- redis-cli DEL highway:tasks >/dev/null
+}
+
+wait_ready() {
+  kubectl -n "$NS" rollout status deploy --timeout=180s >/dev/null
+  local pods
+  for _ in $(seq 60); do
+    # capture first: `kubectl | grep -q` under pipefail returns 141 (SIGPIPE) on a match
+    pods=$(kubectl -n "$NS" get pods --no-headers 2>/dev/null || true)
+    grep -q Terminating <<<"$pods" || return 0
+    sleep 2
+  done
+  echo "warning: pods still Terminating after 120s" >&2
+}
+
+# applogs <app> <container> [since_seconds]
+# Logs across every pod of an app (no "Found 2 pods" guess). Never fails the script.
+applogs() {
+  local since=()
+  [[ -n "${3:-}" ]] && since=(--since="${3}s")
+  kubectl -n "$NS" logs -l "app=$1" -c "$2" --tail=-1 ${since[@]+"${since[@]}"} 2>/dev/null || true
+}
 
 tools_admin() {  # tools_admin reset|poison|state
   local method=POST; [[ "$1" == state ]] && method=GET
