@@ -1,0 +1,101 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata: {name: spire-agent, namespace: spire}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata: {name: spire-agent}
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "nodes", "nodes/proxy"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata: {name: spire-agent}
+subjects: [{kind: ServiceAccount, name: spire-agent, namespace: spire}]
+roleRef: {kind: ClusterRole, name: spire-agent, apiGroup: rbac.authorization.k8s.io}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata: {name: spire-agent, namespace: spire}
+data:
+  agent.conf: |
+    agent {
+      data_dir = "/run/spire"
+      log_level = "INFO"
+      server_address = "spire-server.spire.svc.cluster.local"
+      server_port = "8081"
+      socket_path = "/run/spire/sockets/agent.sock"
+      trust_bundle_path = "/run/spire/bundle/bundle.crt"
+      trust_domain = "highway.lab"
+    }
+    plugins {
+      NodeAttestor "k8s_psat" {
+        plugin_data {
+          cluster = "highway"
+          token_path = "/var/run/secrets/tokens/spire-agent"
+        }
+      }
+      KeyManager "memory" {
+        plugin_data {}
+      }
+      # Workload attestation: when a process opens the socket, the agent asks
+      # the kubelet which pod it is (namespace, ServiceAccount, labels...).
+      WorkloadAttestor "k8s" {
+        plugin_data {
+          skip_kubelet_verification = true   # k3d kubelet uses a self-signed cert
+          node_name_env = "MY_NODE_NAME"
+        }
+      }
+      WorkloadAPIServer "workload_api" {
+        plugin_data {
+          listen_addr = "unix:///run/spire/sockets/agent.sock"
+        }
+      }
+    }
+    health_checks {
+      listener_enabled = true
+      bind_address = "0.0.0.0"
+      bind_port = "8088"
+      live_path = "/live"
+      ready_path = "/ready"
+    }
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata: {name: spire-agent, namespace: spire}
+spec:
+  selector: {matchLabels: {app: spire-agent}}
+  template:
+    metadata: {labels: {app: spire-agent}}
+    spec:
+      serviceAccountName: spire-agent
+      hostPID: true          # needed to map a socket caller's PID to its pod
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      containers:
+        - name: spire-agent
+          image: ghcr.io/spiffe/spire-agent:SPIRE_VERSION
+          args: ["-config", "/run/spire/config/agent.conf"]
+          env:
+            - name: MY_NODE_NAME
+              valueFrom: {fieldRef: {fieldPath: spec.nodeName}}
+          livenessProbe: {httpGet: {path: /live, port: 8088}, initialDelaySeconds: 15}
+          readinessProbe: {httpGet: {path: /ready, port: 8088}, initialDelaySeconds: 10}
+          volumeMounts:
+            - {name: config, mountPath: /run/spire/config, readOnly: true}
+            - {name: bundle, mountPath: /run/spire/bundle, readOnly: true}
+            - {name: sockets, mountPath: /run/spire/sockets}
+            - {name: token, mountPath: /var/run/secrets/tokens}
+      volumes:
+        - name: config
+          configMap: {name: spire-agent}
+        - name: bundle
+          configMap: {name: spire-bundle}
+        - name: sockets
+          hostPath: {path: /run/spire/agent-sockets, type: DirectoryOrCreate}
+        - name: token
+          projected:
+            sources:
+              - serviceAccountToken: {path: spire-agent, expirationSeconds: 7200, audience: spire-server}

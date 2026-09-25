@@ -1,0 +1,22 @@
+## step 1: rogue fetches an SVID
+FetchX509SvidError: Error fetching X.509 SVID: Could not process response from the Workload API: no identity issued (StatusCode.PERMISSION_DENIED)
+## step 2: forge unsigned
+23:22:10 forge=pushed mode=unsigned claimed_signer=- instruction='delete bucket prod-archive'
+## step 3: forge self-signed
+23:22:13 forge=pushed mode=self-signed claimed_signer=spiffe://highway.lab/ns/migration/sa/planner-agent instruction='delete bucket prod-archive'
+## step 4: tamper in queue (executor paused)
+23:22:16 planner=plan task_id=43 steps=2
+23:22:16 planner=step task_id=43 step=1 instruction='copy bucket customer-data to regulated-customer-data'
+23:22:16 broker=put task_id=43 step=1 signed_by=spiffe://highway.lab/ns/migration/sa/planner-agent
+23:22:16 planner=step task_id=43 step=2 instruction='copy bucket billing-exports to regulated-billing-exports'
+23:22:16 broker=put task_id=43 step=2 signed_by=spiffe://highway.lab/ns/migration/sa/planner-agent
+23:22:17 forge=tampered index=0 before='copy bucket customer-data to regulated-customer-data' after='delete bucket prod-archive'
+23:22:17 forge=tampered index=1 before='copy bucket billing-exports to regulated-billing-exports' after='delete bucket prod-archive'
+## step 5: identity != permission
+23:22:23 planner=plan task_id=44 steps=3
+23:22:23 planner=step task_id=44 step=1 instruction='copy bucket customer-data to regulated-customer-data'
+23:22:23 broker=put task_id=44 step=1 signed_by=spiffe://highway.lab/ns/migration/sa/planner-agent
+23:22:23 planner=step task_id=44 step=2 instruction='delete bucket prod-archive'
+23:22:23 broker=put task_id=44 step=2 signed_by=spiffe://highway.lab/ns/migration/sa/planner-agent
+23:22:23 planner=step task_id=44 step=3 instruction='copy bucket billing-exports to regulated-billing-exports'
+23:22:23 broker=put task_id=44 step=3 signed_by=spiffe://highway.lab/ns/migration/sa/planner-agent

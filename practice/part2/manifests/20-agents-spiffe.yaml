@@ -1,0 +1,89 @@
+# Part 2 versions of the agents: same image, plus the SPIRE Workload API socket.
+# Signing/verification is off at first (the break); run.sh flips it on (the fix).
+apiVersion: v1
+kind: ConfigMap
+metadata: {name: highway-signing, namespace: migration}
+data:
+  SIGN_PAYLOADS: "false"
+  VERIFY_PAYLOADS: "false"
+  ALLOWED_SIGNERS: spiffe://highway.lab/ns/migration/sa/planner-agent
+  SPIFFE_ENDPOINT_SOCKET: unix:///run/spire/sockets/agent.sock
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: planner-agent, namespace: migration}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: planner-agent}}
+  template:
+    metadata: {labels: {app: planner-agent}}
+    spec:
+      serviceAccountName: planner-agent
+      containers:
+        - name: planner
+          image: highway-agent:dev
+          imagePullPolicy: IfNotPresent
+          command: ["sleep", "infinity"]
+          env: [{name: AGENT_NAME, value: planner-agent}]
+          envFrom:
+            - configMapRef: {name: highway-config}
+            - configMapRef: {name: highway-signing}
+            - secretRef: {name: llm-credentials}
+          volumeMounts: [{name: spire, mountPath: /run/spire/sockets, readOnly: true}]
+      volumes:
+        - name: spire
+          hostPath: {path: /run/spire/agent-sockets, type: Directory}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: executor-agent, namespace: migration}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: executor-agent}}
+  template:
+    metadata: {labels: {app: executor-agent}}
+    spec:
+      serviceAccountName: executor-agent
+      containers:
+        - name: executor
+          image: highway-agent:dev
+          imagePullPolicy: IfNotPresent
+          command: ["python", "-m", "highway.executor"]
+          env: [{name: AGENT_NAME, value: executor-agent}]
+          envFrom:
+            - configMapRef: {name: highway-config}
+            - configMapRef: {name: highway-signing}
+            - secretRef: {name: llm-credentials}
+          volumeMounts: [{name: spire, mountPath: /run/spire/sockets, readOnly: true}]
+      volumes:
+        - name: spire
+          hostPath: {path: /run/spire/agent-sockets, type: Directory}
+---
+# The attacker: a pod in the same namespace, meshed like everyone else, with
+# network access to Redis and the same SPIRE socket. No registration entry.
+apiVersion: v1
+kind: ServiceAccount
+metadata: {name: rogue, namespace: migration}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: rogue, namespace: migration}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: rogue}}
+  template:
+    metadata: {labels: {app: rogue}}
+    spec:
+      serviceAccountName: rogue
+      containers:
+        - name: rogue
+          image: highway-agent:dev
+          imagePullPolicy: IfNotPresent
+          command: ["sleep", "infinity"]
+          envFrom:
+            - configMapRef: {name: highway-config}
+            - configMapRef: {name: highway-signing}
+          volumeMounts: [{name: spire, mountPath: /run/spire/sockets, readOnly: true}]
+      volumes:
+        - name: spire
+          hostPath: {path: /run/spire/agent-sockets, type: Directory}

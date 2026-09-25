@@ -1,0 +1,127 @@
+apiVersion: v1
+kind: Namespace
+metadata: {name: spire}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata: {name: spire-server, namespace: spire}
+---
+# The k8sbundle notifier keeps the trust bundle here; agents read it to bootstrap.
+apiVersion: v1
+kind: ConfigMap
+metadata: {name: spire-bundle, namespace: spire}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata: {name: spire-server}
+rules:
+  - apiGroups: ["authentication.k8s.io"]
+    resources: ["tokenreviews"]
+    verbs: ["create"]
+  - apiGroups: [""]
+    resources: ["nodes", "pods"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata: {name: spire-server}
+subjects: [{kind: ServiceAccount, name: spire-server, namespace: spire}]
+roleRef: {kind: ClusterRole, name: spire-server, apiGroup: rbac.authorization.k8s.io}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata: {name: spire-server-bundle, namespace: spire}
+rules:
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    resourceNames: ["spire-bundle"]
+    verbs: ["get", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata: {name: spire-server-bundle, namespace: spire}
+subjects: [{kind: ServiceAccount, name: spire-server, namespace: spire}]
+roleRef: {kind: Role, name: spire-server-bundle, apiGroup: rbac.authorization.k8s.io}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata: {name: spire-server, namespace: spire}
+data:
+  server.conf: |
+    server {
+      bind_address = "0.0.0.0"
+      bind_port = "8081"
+      trust_domain = "highway.lab"
+      data_dir = "/run/spire/data"
+      log_level = "INFO"
+      ca_key_type = "ec-p256"
+      default_x509_svid_ttl = "1h"
+      ca_subject {
+        country = ["US"]
+        organization = ["SPIFFE"]
+      }
+    }
+    plugins {
+      DataStore "sql" {
+        plugin_data {
+          database_type = "sqlite3"
+          connection_string = "/run/spire/data/datastore.sqlite3"
+        }
+      }
+      # Node attestation: the agent proves which node it runs on with a
+      # projected ServiceAccount token, validated through the TokenReview API.
+      NodeAttestor "k8s_psat" {
+        plugin_data {
+          clusters = {
+            "highway" = { service_account_allow_list = ["spire:spire-agent"] }
+          }
+        }
+      }
+      KeyManager "disk" {
+        plugin_data { keys_path = "/run/spire/data/keys.json" }
+      }
+      Notifier "k8sbundle" {
+        plugin_data { namespace = "spire" config_map = "spire-bundle" }
+      }
+    }
+    health_checks {
+      listener_enabled = true
+      bind_address = "0.0.0.0"
+      bind_port = "8080"
+      live_path = "/live"
+      ready_path = "/ready"
+    }
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata: {name: spire-server, namespace: spire}
+spec:
+  replicas: 1
+  serviceName: spire-server
+  selector: {matchLabels: {app: spire-server}}
+  template:
+    metadata: {labels: {app: spire-server}}
+    spec:
+      serviceAccountName: spire-server
+      containers:
+        - name: spire-server
+          image: ghcr.io/spiffe/spire-server:SPIRE_VERSION
+          args: ["-config", "/run/spire/config/server.conf"]
+          ports: [{containerPort: 8081, name: grpc}]
+          livenessProbe: {httpGet: {path: /live, port: 8080}, initialDelaySeconds: 10}
+          readinessProbe: {httpGet: {path: /ready, port: 8080}, initialDelaySeconds: 5}
+          volumeMounts:
+            - {name: config, mountPath: /run/spire/config, readOnly: true}
+            - {name: data, mountPath: /run/spire/data}
+      volumes:
+        - name: config
+          configMap: {name: spire-server}
+        - name: data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: spire-server, namespace: spire}
+spec:
+  selector: {app: spire-server}
+  ports: [{name: grpc, port: 8081, targetPort: grpc}]

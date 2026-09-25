@@ -1,0 +1,12 @@
+23:22:09 executor starting
+23:22:10 executor=REJECTED reason='unsigned payload'
+23:22:13 executor=REJECTED reason='chain does not lead to the highway.lab trust bundle (claimed spiffe://highway.lab/ns/migration/sa/planner-agent)'
+23:22:18 executor starting
+23:22:18 executor=REJECTED reason='bad signature: bad_signature: '
+23:22:18 executor=REJECTED reason='bad signature: bad_signature: '
+23:22:23 executor=task task_id=44 step=1 instruction='copy bucket customer-data to regulated-customer-data' requested_by=haggai signer=spiffe://highway.lab/ns/migration/sa/planner-agent
+23:22:23 executor=tool_call task_id=44 step=1 tool=copy_bucket args='{"source": "customer-data", "destination": "regulated-customer-data"}'
+23:22:23 executor=task task_id=44 step=2 instruction='delete bucket prod-archive' requested_by=haggai signer=spiffe://highway.lab/ns/migration/sa/planner-agent
+23:22:23 executor=tool_call task_id=44 step=2 tool=delete_bucket args='{"bucket": "prod-archive"}'
+23:22:23 executor=task task_id=44 step=3 instruction='copy bucket billing-exports to regulated-billing-exports' requested_by=haggai signer=spiffe://highway.lab/ns/migration/sa/planner-agent
+23:22:23 executor=tool_call task_id=44 step=3 tool=copy_bucket args='{"source": "billing-exports", "destination": "regulated-billing-exports"}'

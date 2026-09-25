@@ -1,0 +1,46 @@
+
+[1;36m==> Part 1 road first (cluster, agents, Linkerd)[0m
+
+[1;36m==> Building highway-agent:dev and importing it into k3d[0m
+sha256:77c6c4af67bc6b5d316c51b56a7822f18a09d8cc5f8528e10e6dca25e9815593
+
+[1;36m==> Deploying planner, executor, mcp-tools and redis (no mesh yet)[0m
+NAME                              READY   STATUS        RESTARTS   AGE   IP           NODE                   NOMINATED NODE   READINESS GATES
+executor-agent-7b4d987b85-dn84k   2/2     Terminating   0          13m   10.42.0.18   k3d-highway-server-0   <none>           <none>
+executor-agent-7fd6f8d8-7hs92     2/2     Running       0          3s    10.42.1.27   k3d-highway-agent-0    <none>           <none>
+mcp-tools-5bbcd58668-57hl6        2/2     Terminating   0          13m   10.42.0.17   k3d-highway-server-0   <none>           <none>
+mcp-tools-68f774c49b-8bq4t        2/2     Running       0          3s    10.42.0.19   k3d-highway-server-0   <none>           <none>
+planner-agent-674859d588-xk89w    2/2     Running       0          3s    10.42.1.28   k3d-highway-agent-0    <none>           <none>
+planner-agent-7bbf8f57-hvjlp      2/2     Terminating   0          13m   10.42.1.21   k3d-highway-agent-0    <none>           <none>
+redis-5f5b4cdbcd-h224z            0/2     Completed     0          13m   10.42.1.20   k3d-highway-agent-0    <none>           <none>
+redis-8644596cd-8rs4k             2/2     Running       0          3s    10.42.0.20   k3d-highway-server-0   <none>           <none>
+
+[1;36m==> Installing Gateway API v1.5.1 CRDs (Linkerd needs them)[0m
+
+[1;36m==> Paving the road: inject the proxy into every pod in 'migration'[0m
+I0925 00:11:13.624144   35887 warnings.go:107] "Warning: v1 Endpoints is deprecated in v1.33+; use discovery.k8s.io/v1 EndpointSlice"
+linkerd check --proxy: ok
+NAME                              READY   STATUS        RESTARTS   AGE
+executor-agent-65db7845f5-z8wxq   2/2     Running       0          10s
+executor-agent-7b4d987b85-dn84k   2/2     Terminating   0          13m
+executor-agent-7fd6f8d8-7hs92     2/2     Terminating   0          18s
+mcp-tools-587fcf79f5-wzvd8        2/2     Running       0          14s
+planner-agent-674859d588-xk89w    2/2     Terminating   0          18s
+planner-agent-769cf487b7-d8nzm    2/2     Running       0          10s
+planner-agent-7bbf8f57-hvjlp      2/2     Terminating   0          13m
+redis-687448c66f-bf8jq            2/2     Running       0          14s
+
+[1;36m==> Installing SPIRE 1.15.3 (server + agent DaemonSet)[0m
+
+[1;36m==> Registering identities: node alias + one entry per agent[0m
+SPIFFE ID               : spiffe://highway.lab/ns/migration/sa/executor-agent
+Selector                : k8s:ns:migration
+Selector                : k8s:sa:executor-agent
+SPIFFE ID               : spiffe://highway.lab/ns/migration/sa/mcp-tools
+Selector                : k8s:ns:migration
+Selector                : k8s:sa:mcp-tools
+SPIFFE ID               : spiffe://highway.lab/ns/migration/sa/planner-agent
+Selector                : k8s:ns:migration
+Selector                : k8s:sa:planner-agent
+
+[1;36m==> Redeploying agents with the Workload API socket (signing OFF)[0m

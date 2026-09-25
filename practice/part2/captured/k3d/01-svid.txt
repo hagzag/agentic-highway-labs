@@ -1,0 +1,5 @@
+
+[1;36m==> Each agent asks the local SPIRE agent: who am I?[0m
+planner-agent   FetchX509SvidError: no identity issued (StatusCode.PERMISSION_DENIED)
+executor-agent  FetchX509SvidError: no identity issued (StatusCode.PERMISSION_DENIED)
+rogue           FetchX509SvidError: no identity issued (StatusCode.PERMISSION_DENIED)

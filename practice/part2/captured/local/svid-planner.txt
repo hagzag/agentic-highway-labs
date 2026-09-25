@@ -1,0 +1,8 @@
+Received 1 svid after 2.704792ms
+
+SPIFFE ID:		spiffe://highway.lab/ns/migration/sa/planner-agent
+SVID Valid After:	2026-09-24 20:20:27 +0000 UTC
+SVID Valid Until:	2026-09-24 21:20:37 +0000 UTC
+CA #1 Valid After:	2026-09-24 20:20:13 +0000 UTC
+CA #1 Valid Until:	2026-09-25 20:20:23 +0000 UTC
+
