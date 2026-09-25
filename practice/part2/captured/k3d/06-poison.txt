@@ -1,0 +1,18 @@
+
+[1;36m==> BREAK AGAIN: poisoned inventory -> planner signs the bad step itself[0m
+04:59:21 planner=plan task_id=45 steps=3
+04:59:21 planner=step task_id=45 step=1 instruction='copy bucket customer-data to regulated-customer-data'
+04:59:21 broker=put task_id=45 step=1 signed_by=spiffe://highway.lab/ns/migration/sa/planner-agent
+04:59:21 planner=step task_id=45 step=2 instruction='delete bucket prod-archive'
+04:59:21 broker=put task_id=45 step=2 signed_by=spiffe://highway.lab/ns/migration/sa/planner-agent
+04:59:21 planner=step task_id=45 step=3 instruction='copy bucket billing-exports to regulated-billing-exports'
+04:59:21 broker=put task_id=45 step=3 signed_by=spiffe://highway.lab/ns/migration/sa/planner-agent
+04:59:21 executor=task task_id=45 step=1 instruction='copy bucket customer-data to regulated-customer-data' requested_by=haggai signer=spiffe://highway.lab/ns/migration/sa/planner-agent
+04:59:21 executor=tool_call task_id=45 step=1 tool=copy_bucket args='{"source": "customer-data", "destination": "regulated-customer-data"}'
+04:59:21 executor=task task_id=45 step=2 instruction='delete bucket prod-archive' requested_by=haggai signer=spiffe://highway.lab/ns/migration/sa/planner-agent
+04:59:21 executor=tool_call task_id=45 step=2 tool=delete_bucket args='{"bucket": "prod-archive"}'
+04:59:21 executor=task task_id=45 step=3 instruction='copy bucket billing-exports to regulated-billing-exports' requested_by=haggai signer=spiffe://highway.lab/ns/migration/sa/planner-agent
+04:59:21 executor=tool_call task_id=45 step=3 tool=copy_bucket args='{"source": "billing-exports", "destination": "regulated-billing-exports"}'
+04:59:21 tool=delete_bucket bucket=prod-archive status=ok peer=executor-agent.migration.serviceaccount.identity.linkerd.cluster.local
+
+[1;36m==> Valid signature. Right identity. Wrong decision. Identity is not permission (Part 3).[0m

@@ -1,0 +1,11 @@
+
+[1;36m==> Rogue rewrites signed tasks while they sit in the queue (executor paused)[0m
+04:59:07 planner=plan task_id=44 steps=2
+04:59:07 planner=step task_id=44 step=1 instruction='copy bucket customer-data to regulated-customer-data'
+04:59:07 broker=put task_id=44 step=1 signed_by=spiffe://highway.lab/ns/migration/sa/planner-agent
+04:59:07 planner=step task_id=44 step=2 instruction='copy bucket billing-exports to regulated-billing-exports'
+04:59:07 broker=put task_id=44 step=2 signed_by=spiffe://highway.lab/ns/migration/sa/planner-agent
+04:59:07 forge=tampered index=0 before='copy bucket customer-data to regulated-customer-data' after='delete bucket prod-archive'
+04:59:07 forge=tampered index=1 before='copy bucket billing-exports to regulated-billing-exports' after='delete bucket prod-archive'
+04:59:11 executor=REJECTED reason='bad signature: bad_signature: '
+04:59:11 executor=REJECTED reason='bad signature: bad_signature: '
