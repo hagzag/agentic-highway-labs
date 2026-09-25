@@ -61,19 +61,30 @@ After signing enabled:
 ```
 **VERIFIED**: Planner signs payloads with its SPIFFE identity, NOT a long-lived static key.
 
-### ⚠️ Claim 3: Rogue forges are rejected (NEEDS DEBUGGING)
-**Expected behavior**: 
+### ✅ Claim 3: Rogue forges are rejected
 ```
-Rogue tries: unsigned, then self-signed claiming planner's SPIFFE ID
-Both should be REJECTED
+executor=REJECTED reason='unsigned payload'
+executor=REJECTED reason='chain does not lead to the highway.lab trust bundle (claimed spiffe://highway.lab/ns/migration/sa/planner-agent)'
 ```
+**VERIFIED**: Unsigned and self-signed forgeries both rejected. SPIRE Workload API fix enables signature verification.
 
-**Actual behavior**:
-- Unsigned was injected (not validated?)
-- Self-signed push logged but executor rejection logs not captured
-- SPIRE Workload API issue: `FetchX509SvidError: no identity issued (StatusCode.PERMISSION_DENIED)`
+### ✅ Claim 4: Queue tampering detected
+```
+forge=tampered index=0 before='copy bucket customer-data...' after='delete bucket prod-archive'
+forge=tampered index=1 before='copy bucket billing-exports...' after='delete bucket prod-archive'
+executor=REJECTED reason='bad signature: bad_signature: '
+executor=REJECTED reason='bad signature: bad signature: '
+```
+**VERIFIED**: Rogue rewrote both tasks in Redis; signatures detected the tampering.
 
-**Issue**: Agents cannot fetch SVIDs from SPIRE due to permission/configuration problem. This breaks signature verification.
+### ✅ Claim 5: Valid signature on bad decision still executes
+```
+planner=step task_id=45 step=2 instruction='delete bucket prod-archive'
+broker=put task_id=45 step=2 signed_by=spiffe://highway.lab/ns/migration/sa/planner-agent
+executor=task task_id=45 step=2 ... signer=spiffe://highway.lab/ns/migration/sa/planner-agent
+tool=delete_bucket bucket=prod-archive status=ok peer=executor-agent...
+```
+**VERIFIED**: Poisoned inventory makes legitimate planner sign bad instruction. Signature is valid, identity is correct, decision is wrong. Identity ≠ permission.
 
 ---
 
@@ -92,36 +103,36 @@ It provides:
 
 ## Part 2 Status
 
-**What works:**
-- ✅ SPIRE identity registration
-- ✅ Planner can sign with SPIFFE-bound keys
-- ✅ Rogue pod can push unsigned tasks (demonstrates the vulnerability)
+**All tests passing:**
+- ✅ SPIRE identity registration and issuance
+- ✅ Agents fetch valid X.509-SVIDs from Workload API
+- ✅ Rogue pod denied SVID (not registered)
+- ✅ Unsigned tasks rejected
+- ✅ Self-signed forgeries rejected
+- ✅ Queue tampering detected
+- ✅ Poisoned inventory demonstrates "identity ≠ permission"
 
-**What needs debugging:**
-- ❌ SPIRE Workload API permission issue (agents can't fetch SVIDs)
-- ❌ Executor signature verification isn't working
-- ❌ Forge rejection test incomplete
-
-**Root cause**: SPIRE setup has a permission/authentication issue preventing agents from obtaining their X.509 SVIDs from the Workload API socket. This is a k3d SPIRE configuration issue, not a design problem.
+**SPIRE fix applied:**
+Added `WorkloadAPIServer "workload_api"` listener to agent config. Agents can now fetch SVIDs from the Workload API socket mounted at `/run/spire/sockets/agent.sock`.
 
 ---
 
 ## Next Steps
 
-1. **Debug SPIRE Workload API**: Check SPIRE agent logs for permission errors
-2. **Fix SPIRE socket mount**: Ensure agents can access the Workload API socket
-3. **Rerun Part 2 forge tests**: Verify that unsigned and self-signed attempts are rejected
-4. **Document Part 3**: Permission delegation with short-lived tokens (should be available)
+1. **Part 3 (Driving Permits)**: Delegation with short-lived tokens scoped to specific tasks
+2. **Part 4 (The Closed Track)**: Sandboxing and blast radius prediction
+3. **Part 5 (The Black Box)**: Audit chain naming human, agent, and task
 
 ---
 
 ## Summary Table
 
-| Feature | Part 1 | Part 2 (Partial) |
-|---------|--------|-----------------|
-| Encryption | ✅ | ✅ (inherited) |
-| Workload Auth | ✅ | ✅ |
-| Message Signing | ❌ | ✅ (planner signs) |
-| Signature Verification | ❌ | ⚠️ (SPIRE issue) |
-| Rejecting Forgeries | ❌ | ⚠️ (SPIRE issue) |
-| Per-Task Authorization | ❌ | ❌ (Part 3) |
+| Feature | Part 1 | Part 2 |
+|---------|--------|--------|
+| Encryption | ✅ | ✅ (inherited from Linkerd) |
+| Workload Auth | ✅ (mTLS) | ✅ (SPIFFE SVID) |
+| Message Signing | ❌ | ✅ (JWS with SVID) |
+| Signature Verification | ❌ | ✅ (against SPIRE trust bundle) |
+| Rejecting Forgeries | ❌ | ✅ (unsigned + self-signed) |
+| Detecting Tampering | ❌ | ✅ (queue rewriting detected) |
+| Per-Task Authorization | ❌ | ❌ (Part 3: Driving Permits) |
