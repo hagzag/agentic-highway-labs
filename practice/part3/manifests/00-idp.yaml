@@ -1,0 +1,49 @@
+# The human's identity provider. Keycloak in dev mode, realm "highway" imported
+# from practice/part3/idp/highway-realm.json (run.sh creates the ConfigMap).
+# Users: hagzag, tester (migrator); ops-admin (migrator + storage-admin).
+# Password = username. Lab only.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: idp
+  labels: {app.kubernetes.io/part-of: agentic-highway}
+  annotations: {linkerd.io/inject: enabled}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: keycloak, namespace: idp}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: keycloak}}
+  template:
+    metadata: {labels: {app: keycloak}}
+    spec:
+      containers:
+        - name: keycloak
+          image: quay.io/keycloak/keycloak:KEYCLOAK_VERSION
+          args: ["start-dev", "--import-realm", "--health-enabled=true"]
+          env:
+            - {name: KC_BOOTSTRAP_ADMIN_USERNAME, value: admin}
+            - {name: KC_BOOTSTRAP_ADMIN_PASSWORD, value: admin}
+          ports:
+            - {containerPort: 8080, name: http}
+            - {containerPort: 9000, name: management}
+          readinessProbe:
+            httpGet: {path: /health/ready, port: management}
+            initialDelaySeconds: 15
+            periodSeconds: 5
+            failureThreshold: 60
+          resources:
+            requests: {memory: 512Mi}
+            limits: {memory: 1Gi}
+          volumeMounts: [{name: realm, mountPath: /opt/keycloak/data/import, readOnly: true}]
+      volumes:
+        - name: realm
+          configMap: {name: keycloak-realm}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: keycloak, namespace: idp}
+spec:
+  selector: {app: keycloak}
+  ports: [{port: 8080, targetPort: http, name: http}]

@@ -1,7 +1,7 @@
 # agentic-highway-labs
 
 Hands-on labs for **The Agentic Highway: Cryptographic Trust in the Agentic Era**.
-
+![](https://i.ibb.co/HLp4Mw74/Agentis-highway-labs-2.jpg)
 > *mTLS is the highway, not the traffic law.*
 
 Each part runs on a local k3d cluster. Each lab breaks something before it fixes it.
@@ -10,7 +10,7 @@ Each part runs on a local k3d cluster. Each lab breaks something before it fixes
 |---|---|---|---|
 | 1 | The Safe Highway | [practice/part1](practice/part1) — plaintext sniff → Linkerd mTLS → poisoned inventory | An authenticated agent deletes `prod-archive`. The log can't say who asked. |
 | 2 | License Plates | [practice/part2](practice/part2) — SPIRE SVIDs → JWS-signed tasks across Redis | Forgery and tampering are rejected. A validly signed bad instruction still runs: identity ≠ permission. |
-| 3 | Driving Permits | _coming_ | |
+| 3 | Driving Permits | [practice/part3](practice/part3) — Keycloak login → RFC 8693 token exchange (`sub` + `act`) → OPA at the MCP gateway; LLM key behind a gateway | The signed delete is denied, and a stolen permit is useless. A pod that skips the gateway still deletes `prod-archive`. |
 | 4 | The Closed Track | _coming_ | |
 | 5 | The Black Box | _coming_ | |
 
@@ -23,13 +23,17 @@ Each part runs on a local k3d cluster. Each lab breaks something before it fixes
 | `mcp-tools` | MCP server (Python SDK 2.x, streamable HTTP) with `list_buckets`, `read_inventory`, `copy_bucket` and `delete_bucket` over a fake object store. |
 | `redis` | The broker between the planner and the executor. This is where mTLS ends. |
 | `rogue` (Part 2) | A pod in the same namespace with Redis access. It has no SPIRE entry. |
+| `sts` (Part 3) | The permit office: RFC 8693 token exchange. Human token + agent JWT-SVID → short-lived permit. |
+| `mcp-gateway` (Part 3) | Verifies the permit and the caller's JWT-SVID; OPA sidecar decides each MCP call. |
+| `llm-gateway` (Part 3) | The only pod holding `LLM_API_KEY`. Agents authenticate with a JWT-SVID. |
+| `keycloak` (Part 3, ns `idp`) | The humans' IdP. Realm `highway`: `hagzag`, `tester`, `ops-admin`. |
 
 The agent code is plain Python: an agent loop and the MCP SDK, with no framework. See [src/highway](src/highway).
 
 ## Prerequisites
 
 - Docker, [k3d](https://k3d.io) ≥ 5.8, kubectl ≥ 1.27 (for `kubectl debug --profile`), [Task](https://taskfile.dev)
-- Network access to Docker Hub, `ghcr.io` and `cr.l5d.io`
+- Network access to Docker Hub, `ghcr.io`, `cr.l5d.io` and `quay.io` (Keycloak)
 - ~4 GB RAM free for the cluster
 
 The scripts install the Linkerd CLI themselves if it's missing. Pinned versions are in [scripts/lib.sh](scripts/lib.sh):
@@ -37,6 +41,7 @@ The scripts install the Linkerd CLI themselves if it's missing. Pinned versions 
 - Linkerd `edge-26.9.3` (open-source Linkerd ships edge releases only)
 - Gateway API `v1.5.1`
 - SPIRE `1.15.3`
+- Keycloak `26.7.4`, OPA `1.20.1` (Part 3)
 
 ## LLM
 
@@ -57,6 +62,7 @@ The API key is a static Secret mounted into every agent pod. That's on purpose: 
 ```bash
 task part1:all      # or step by step: task --list
 task part2:all
+task part3:all
 task down
 ```
 

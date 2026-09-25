@@ -1,0 +1,15 @@
+09:36:16 mcp-gateway starting port=8091 upstream=http://127.0.0.1:8000/mcp opa=http://127.0.0.1:8181/v1/data/highway/mcp/decision
+09:36:21 gateway=ALLOW tool=read_inventory sub=tester act=planner-agent caller=planner-agent task_id=46 args={}
+09:36:21 gateway=ALLOW tool=copy_bucket sub=tester act='executor-agent via planner-agent' caller=executor-agent task_id=46 args='{"source": "customer-data", "destination": "regulated-customer-data"}'
+09:36:22 gateway=ALLOW tool=copy_bucket sub=tester act='executor-agent via planner-agent' caller=executor-agent task_id=46 args='{"source": "billing-exports", "destination": "regulated-billing-exports"}'
+09:36:28 gateway=ALLOW tool=read_inventory sub=tester act=planner-agent caller=planner-agent task_id=47 args={}
+09:36:28 gateway=ALLOW tool=copy_bucket sub=tester act='executor-agent via planner-agent' caller=executor-agent task_id=47 args='{"source": "customer-data", "destination": "regulated-customer-data"}'
+09:36:29 gateway=DENY method=tools/call tool=delete_bucket sub=tester act='executor-agent via planner-agent' caller=executor-agent task_id=47 reason='prod-archive is under retention lock; scope buckets:delete not in permit'
+09:36:29 gateway=ALLOW tool=copy_bucket sub=tester act='executor-agent via planner-agent' caller=executor-agent task_id=47 args='{"source": "billing-exports", "destination": "regulated-billing-exports"}'
+09:36:35 gateway=ALLOW tool=read_inventory sub=ops-admin act=planner-agent caller=planner-agent task_id=48 args={}
+09:36:35 gateway=ALLOW tool=copy_bucket sub=ops-admin act='executor-agent via planner-agent' caller=executor-agent task_id=48 args='{"source": "customer-data", "destination": "regulated-customer-data"}'
+09:36:36 gateway=DENY method=tools/call tool=delete_bucket sub=ops-admin act='executor-agent via planner-agent' caller=executor-agent task_id=48 reason='prod-archive is under retention lock'
+09:36:36 gateway=ALLOW tool=copy_bucket sub=ops-admin act='executor-agent via planner-agent' caller=executor-agent task_id=48 args='{"source": "billing-exports", "destination": "regulated-billing-exports"}'
+09:36:43 gateway=ALLOW tool=read_inventory sub=tester act=planner-agent caller=planner-agent task_id=49 args={}
+09:36:44 gateway=DENY method=server/discover tool=- sub=tester act=planner-agent caller=- task_id=49 reason='no actor token (JWT-SVID)'
+09:36:44 gateway=DENY method=initialize tool=- sub=tester act=planner-agent caller=- task_id=49 reason='no actor token (JWT-SVID)'

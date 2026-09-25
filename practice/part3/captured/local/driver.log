@@ -1,0 +1,56 @@
+
+==> login: tester @ Keycloak realm highway
+{
+  "iss": "http://localhost:8080/realms/highway",
+  "sub": "c21f1139-3493-481c-96be-b051d1a41c9f",
+  "preferred_username": "tester",
+  "azp": "highway-cli",
+  "realm_access": {
+    "roles": [
+      "migrator"
+    ]
+  },
+  "scope": "openid email profile",
+  "exp": 1790318479,
+  "iat": 1790318179
+}
+
+==> permit: task 46 as tester
+09:36:20 planner=permit task_id=46 sub=tester act=planner-agent scope='buckets:copy buckets:read' expires_in=120s
+09:36:20 sts=issued sub=tester act=planner-agent scope='buckets:copy buckets:read' dropped=buckets:delete ttl=120 task_id=46
+09:36:21 sts=issued sub=tester act='executor-agent via planner-agent' scope='buckets:copy buckets:read' dropped=- ttl=119 task_id=46
+09:36:22 sts=issued sub=tester act='executor-agent via planner-agent' scope='buckets:copy buckets:read' dropped=- ttl=118 task_id=46
+09:36:21 gateway=ALLOW tool=read_inventory sub=tester act=planner-agent caller=planner-agent task_id=46 args={}
+09:36:21 gateway=ALLOW tool=copy_bucket sub=tester act='executor-agent via planner-agent' caller=executor-agent task_id=46 args='{"source": "customer-data", "destination": "regulated-customer-data"}'
+09:36:22 gateway=ALLOW tool=copy_bucket sub=tester act='executor-agent via planner-agent' caller=executor-agent task_id=46 args='{"source": "billing-exports", "destination": "regulated-billing-exports"}'
+09:36:21 executor=permit task_id=46 step=1 sub=tester act='executor-agent via planner-agent' scope='buckets:copy buckets:read' expires_in=119s
+09:36:22 executor=permit task_id=46 step=2 sub=tester act='executor-agent via planner-agent' scope='buckets:copy buckets:read' expires_in=118s
+09:36:21 tool=read_inventory status=ok peer=- sub=tester
+09:36:21 tool=copy_bucket bucket=customer-data destination=regulated-customer-data status=ok peer=- sub=tester
+09:36:22 tool=copy_bucket bucket=billing-exports destination=regulated-billing-exports status=ok peer=- sub=tester
+
+==> poison: task 47 as tester
+09:36:28 sts=issued sub=tester act=planner-agent scope='buckets:copy buckets:read' dropped=buckets:delete ttl=120 task_id=47
+09:36:28 executor=task task_id=47 step=1 instruction='copy bucket customer-data to regulated-customer-data' requested_by=tester signer=spiffe://highway.lab/ns/migration/sa/planner-agent
+09:36:29 executor=task task_id=47 step=2 instruction='delete bucket prod-archive' requested_by=tester signer=spiffe://highway.lab/ns/migration/sa/planner-agent
+09:36:29 executor=denied task_id=47 step=2 tool=delete_bucket result='DENIED by policy: prod-archive is under retention lock; scope buckets:delete not in permit'
+09:36:29 executor=task task_id=47 step=3 instruction='copy bucket billing-exports to regulated-billing-exports' requested_by=tester signer=spiffe://highway.lab/ns/migration/sa/planner-agent
+09:36:29 gateway=DENY method=tools/call tool=delete_bucket sub=tester act='executor-agent via planner-agent' caller=executor-agent task_id=47 reason='prod-archive is under retention lock; scope buckets:delete not in permit'
+
+==> admin: task 48 as ops-admin
+09:36:35 sts=issued sub=ops-admin act=planner-agent scope='buckets:copy buckets:delete buckets:read' dropped=- ttl=120 task_id=48
+09:36:36 gateway=DENY method=tools/call tool=delete_bucket sub=ops-admin act='executor-agent via planner-agent' caller=executor-agent task_id=48 reason='prod-archive is under retention lock'
+
+==> steal (executor stopped)
+09:36:44 forge=stolen task_id=49 sub=tester act=planner-agent scope='buckets:copy buckets:read'
+09:36:44 forge=result target=http://127.0.0.1:8091/mcp result='refused: no actor token (JWT-SVID)'
+09:36:44 gateway=DENY method=server/discover tool=- sub=tester act=planner-agent caller=- task_id=49 reason='no actor token (JWT-SVID)'
+09:36:44 gateway=DENY method=initialize tool=- sub=tester act=planner-agent caller=- task_id=49 reason='no actor token (JWT-SVID)'
+
+==> llm: rogue calls llm-gateway
+{"error":{"message":"no JWT-SVID"}}
+09:36:46 llm=DENY reason='no JWT-SVID'
+
+==> bypass: rogue calls mcp-tools directly
+09:36:46 forge=bypass target=http://127.0.0.1:8000/mcp result='{"result": "deleted prod-archive"}'
+09:36:46 tool=delete_bucket bucket=prod-archive status=ok peer=- sub=-

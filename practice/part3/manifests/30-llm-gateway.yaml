@@ -1,0 +1,38 @@
+# The only pod that mounts llm-credentials. Agents present a JWT-SVID instead.
+apiVersion: v1
+kind: ServiceAccount
+metadata: {name: llm-gateway, namespace: migration}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: llm-gateway, namespace: migration}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: llm-gateway}}
+  template:
+    metadata: {labels: {app: llm-gateway}}
+    spec:
+      serviceAccountName: llm-gateway
+      containers:
+        - name: llm-gateway
+          image: highway-agent:dev
+          imagePullPolicy: IfNotPresent
+          command: ["python", "-m", "highway.llm_gateway"]
+          ports: [{containerPort: 8080, name: http}]
+          readinessProbe:
+            httpGet: {path: /healthz, port: http}
+            periodSeconds: 3
+          envFrom:
+            - configMapRef: {name: highway-config}   # LLM_MODE / LLM_BASE_URL = the upstream
+            - secretRef: {name: llm-credentials}     # the key lives here now, and only here
+          volumeMounts: [{name: spire, mountPath: /run/spire/sockets, readOnly: true}]
+      volumes:
+        - name: spire
+          hostPath: {path: /run/spire/agent-sockets, type: Directory}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: llm-gateway, namespace: migration}
+spec:
+  selector: {app: llm-gateway}
+  ports: [{port: 8080, targetPort: http, name: http}]

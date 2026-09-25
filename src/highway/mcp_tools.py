@@ -3,6 +3,10 @@
 Every tool call is logged with the caller identity the transport can prove.
 With Linkerd, the proxy adds `l5d-client-id` (the peer's mTLS identity) to
 inbound requests. Without a mesh, there is nothing to log: peer=-.
+
+Part 3: behind the MCP gateway, the gateway adds `x-highway-sub` (the human the
+permit names), logged as sub= when LOG_SUB=true. A call that skipped the
+gateway has none: sub=-.
 """
 import copy
 import os
@@ -35,6 +39,14 @@ def _peer(ctx: Context) -> str:
     return headers.get("l5d-client-id", "-")
 
 
+def _who(ctx: Context) -> dict:
+    """peer= always; sub= once Part 3 puts a gateway in front (LOG_SUB=true)."""
+    who = {"peer": _peer(ctx)}
+    if os.environ.get("LOG_SUB"):
+        who["sub"] = (ctx.headers or {}).get("x-highway-sub", "-")
+    return who
+
+
 def _find(name: str) -> dict | None:
     return next((b for b in STORE["buckets"] if b["name"] == name), None)
 
@@ -42,14 +54,14 @@ def _find(name: str) -> dict | None:
 @mcp.tool()
 def list_buckets(ctx: Context) -> list[str]:
     """List bucket names in the source environment."""
-    log("tool=list_buckets", status="ok", peer=_peer(ctx))
+    log("tool=list_buckets", status="ok", **_who(ctx))
     return [b["name"] for b in STORE["buckets"]]
 
 
 @mcp.tool()
 def read_inventory(ctx: Context) -> dict:
     """Return the migration inventory: buckets, flags and owner notes."""
-    log("tool=read_inventory", status="ok", peer=_peer(ctx))
+    log("tool=read_inventory", status="ok", **_who(ctx))
     return STORE
 
 
@@ -58,11 +70,11 @@ def copy_bucket(source: str, destination: str, ctx: Context) -> str:
     """Copy a bucket to a destination bucket in the regulated environment."""
     src = _find(source)
     if src is None:
-        log("tool=copy_bucket", bucket=source, status="not_found", peer=_peer(ctx))
+        log("tool=copy_bucket", bucket=source, status="not_found", **_who(ctx))
         return f"bucket {source} not found"
     if _find(destination) is None:
         STORE["buckets"].append({**src, "name": destination, "migrate": False, "notes": f"copy of {source}"})
-    log("tool=copy_bucket", bucket=source, destination=destination, status="ok", peer=_peer(ctx))
+    log("tool=copy_bucket", bucket=source, destination=destination, status="ok", **_who(ctx))
     return f"copied {source} -> {destination}"
 
 
@@ -71,10 +83,10 @@ def delete_bucket(bucket: str, ctx: Context) -> str:
     """Delete a bucket. Irreversible."""
     target = _find(bucket)
     if target is None:
-        log("tool=delete_bucket", bucket=bucket, status="not_found", peer=_peer(ctx))
+        log("tool=delete_bucket", bucket=bucket, status="not_found", **_who(ctx))
         return f"bucket {bucket} not found"
     STORE["buckets"].remove(target)
-    log("tool=delete_bucket", bucket=bucket, status="ok", peer=_peer(ctx))
+    log("tool=delete_bucket", bucket=bucket, status="ok", **_who(ctx))
     return f"deleted {bucket}"
 
 

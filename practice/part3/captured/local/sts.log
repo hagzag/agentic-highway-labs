@@ -1,0 +1,13 @@
+09:36:16 sts starting port=8090 issuer=http://127.0.0.1:8090 idp=http://localhost:8080/realms/highway ttl=120
+09:36:20 sts=issued sub=tester act=planner-agent scope='buckets:copy buckets:read' dropped=buckets:delete ttl=120 task_id=46
+09:36:21 sts=issued sub=tester act='executor-agent via planner-agent' scope='buckets:copy buckets:read' dropped=- ttl=119 task_id=46
+09:36:22 sts=issued sub=tester act='executor-agent via planner-agent' scope='buckets:copy buckets:read' dropped=- ttl=118 task_id=46
+09:36:28 sts=issued sub=tester act=planner-agent scope='buckets:copy buckets:read' dropped=buckets:delete ttl=120 task_id=47
+09:36:28 sts=issued sub=tester act='executor-agent via planner-agent' scope='buckets:copy buckets:read' dropped=- ttl=120 task_id=47
+09:36:29 sts=issued sub=tester act='executor-agent via planner-agent' scope='buckets:copy buckets:read' dropped=- ttl=119 task_id=47
+09:36:29 sts=issued sub=tester act='executor-agent via planner-agent' scope='buckets:copy buckets:read' dropped=- ttl=119 task_id=47
+09:36:35 sts=issued sub=ops-admin act=planner-agent scope='buckets:copy buckets:delete buckets:read' dropped=- ttl=120 task_id=48
+09:36:35 sts=issued sub=ops-admin act='executor-agent via planner-agent' scope='buckets:copy buckets:delete buckets:read' dropped=- ttl=120 task_id=48
+09:36:36 sts=issued sub=ops-admin act='executor-agent via planner-agent' scope='buckets:copy buckets:delete buckets:read' dropped=- ttl=119 task_id=48
+09:36:36 sts=issued sub=ops-admin act='executor-agent via planner-agent' scope='buckets:copy buckets:delete buckets:read' dropped=- ttl=119 task_id=48
+09:36:43 sts=issued sub=tester act=planner-agent scope='buckets:copy buckets:read' dropped=buckets:delete ttl=120 task_id=49

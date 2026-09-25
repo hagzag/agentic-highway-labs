@@ -1,0 +1,51 @@
+# Part 3 settings shared by the STS, the gateways and the agents.
+# PERMITS and MCP_URL flip in `run.sh permit`: that's the moment the gateway goes in.
+apiVersion: v1
+kind: ConfigMap
+metadata: {name: highway-permits, namespace: migration}
+data:
+  PERMITS: "false"
+  MCP_URL: http://mcp-tools:8000/mcp
+  STS_URL: http://sts:8080
+  STS_ISSUER: http://sts.migration.svc.cluster.local:8080
+  KEYCLOAK_ISSUER: http://keycloak.idp.svc.cluster.local:8080/realms/highway
+  PERMIT_SCOPES: buckets:read buckets:copy buckets:delete
+  PERMIT_TTL: "120"
+---
+# The permit office: RFC 8693 token exchange. Knows Keycloak's keys and SPIRE's.
+apiVersion: v1
+kind: ServiceAccount
+metadata: {name: sts, namespace: migration}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: sts, namespace: migration}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: sts}}
+  template:
+    metadata: {labels: {app: sts}}
+    spec:
+      serviceAccountName: sts
+      containers:
+        - name: sts
+          image: highway-agent:dev
+          imagePullPolicy: IfNotPresent
+          command: ["python", "-m", "highway.sts"]
+          ports: [{containerPort: 8080, name: http}]
+          readinessProbe:
+            httpGet: {path: /healthz, port: http}
+            periodSeconds: 3
+          envFrom:
+            - configMapRef: {name: highway-permits}
+          volumeMounts: [{name: spire, mountPath: /run/spire/sockets, readOnly: true}]
+      volumes:
+        - name: spire
+          hostPath: {path: /run/spire/agent-sockets, type: Directory}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: sts, namespace: migration}
+spec:
+  selector: {app: sts}
+  ports: [{port: 8080, targetPort: http, name: http}]

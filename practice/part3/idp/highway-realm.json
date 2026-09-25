@@ -1,0 +1,41 @@
+{
+  "realm": "highway",
+  "enabled": true,
+  "accessTokenLifespan": 300,
+  "roles": {
+    "realm": [
+      {"name": "migrator", "description": "May read inventory and copy buckets to the regulated side"},
+      {"name": "storage-admin", "description": "May also delete buckets"}
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "highway-cli",
+      "name": "Migration CLI (lab)",
+      "publicClient": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "protocol": "openid-connect"
+    }
+  ],
+  "users": [
+    {
+      "username": "hagzag", "enabled": true, "emailVerified": true,
+      "email": "hagzag@highway.lab", "firstName": "Haggai", "lastName": "Zagury",
+      "credentials": [{"type": "password", "value": "hagzag", "temporary": false}],
+      "realmRoles": ["migrator"]
+    },
+    {
+      "username": "tester", "enabled": true, "emailVerified": true,
+      "email": "tester@highway.lab", "firstName": "Lab", "lastName": "Tester",
+      "credentials": [{"type": "password", "value": "tester", "temporary": false}],
+      "realmRoles": ["migrator"]
+    },
+    {
+      "username": "ops-admin", "enabled": true, "emailVerified": true,
+      "email": "ops-admin@highway.lab", "firstName": "Ops", "lastName": "Admin",
+      "credentials": [{"type": "password", "value": "ops-admin", "temporary": false}],
+      "realmRoles": ["migrator", "storage-admin"]
+    }
+  ]
+}

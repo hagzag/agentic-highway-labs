@@ -1,0 +1,28 @@
+09:36:17 executor starting
+09:36:21 executor=permit task_id=46 step=1 sub=tester act='executor-agent via planner-agent' scope='buckets:copy buckets:read' expires_in=119s
+09:36:21 executor=task task_id=46 step=1 instruction='copy bucket customer-data to regulated-customer-data' requested_by=tester signer=spiffe://highway.lab/ns/migration/sa/planner-agent
+09:36:21 executor=tool_call task_id=46 step=1 tool=copy_bucket args='{"source": "customer-data", "destination": "regulated-customer-data"}'
+09:36:22 executor=permit task_id=46 step=2 sub=tester act='executor-agent via planner-agent' scope='buckets:copy buckets:read' expires_in=118s
+09:36:22 executor=task task_id=46 step=2 instruction='copy bucket billing-exports to regulated-billing-exports' requested_by=tester signer=spiffe://highway.lab/ns/migration/sa/planner-agent
+09:36:22 executor=tool_call task_id=46 step=2 tool=copy_bucket args='{"source": "billing-exports", "destination": "regulated-billing-exports"}'
+09:36:28 executor=permit task_id=47 step=1 sub=tester act='executor-agent via planner-agent' scope='buckets:copy buckets:read' expires_in=120s
+09:36:28 executor=task task_id=47 step=1 instruction='copy bucket customer-data to regulated-customer-data' requested_by=tester signer=spiffe://highway.lab/ns/migration/sa/planner-agent
+09:36:28 executor=tool_call task_id=47 step=1 tool=copy_bucket args='{"source": "customer-data", "destination": "regulated-customer-data"}'
+09:36:29 executor=permit task_id=47 step=2 sub=tester act='executor-agent via planner-agent' scope='buckets:copy buckets:read' expires_in=119s
+09:36:29 executor=task task_id=47 step=2 instruction='delete bucket prod-archive' requested_by=tester signer=spiffe://highway.lab/ns/migration/sa/planner-agent
+09:36:29 executor=tool_call task_id=47 step=2 tool=delete_bucket args='{"bucket": "prod-archive"}'
+09:36:29 executor=denied task_id=47 step=2 tool=delete_bucket result='DENIED by policy: prod-archive is under retention lock; scope buckets:delete not in permit'
+09:36:29 executor=permit task_id=47 step=3 sub=tester act='executor-agent via planner-agent' scope='buckets:copy buckets:read' expires_in=119s
+09:36:29 executor=task task_id=47 step=3 instruction='copy bucket billing-exports to regulated-billing-exports' requested_by=tester signer=spiffe://highway.lab/ns/migration/sa/planner-agent
+09:36:29 executor=tool_call task_id=47 step=3 tool=copy_bucket args='{"source": "billing-exports", "destination": "regulated-billing-exports"}'
+09:36:35 executor=permit task_id=48 step=1 sub=ops-admin act='executor-agent via planner-agent' scope='buckets:copy buckets:delete buckets:read' expires_in=120s
+09:36:35 executor=task task_id=48 step=1 instruction='copy bucket customer-data to regulated-customer-data' requested_by=ops-admin signer=spiffe://highway.lab/ns/migration/sa/planner-agent
+09:36:35 executor=tool_call task_id=48 step=1 tool=copy_bucket args='{"source": "customer-data", "destination": "regulated-customer-data"}'
+09:36:36 executor=permit task_id=48 step=2 sub=ops-admin act='executor-agent via planner-agent' scope='buckets:copy buckets:delete buckets:read' expires_in=119s
+09:36:36 executor=task task_id=48 step=2 instruction='delete bucket prod-archive' requested_by=ops-admin signer=spiffe://highway.lab/ns/migration/sa/planner-agent
+09:36:36 executor=tool_call task_id=48 step=2 tool=delete_bucket args='{"bucket": "prod-archive"}'
+09:36:36 executor=denied task_id=48 step=2 tool=delete_bucket result='DENIED by policy: prod-archive is under retention lock'
+09:36:36 executor=permit task_id=48 step=3 sub=ops-admin act='executor-agent via planner-agent' scope='buckets:copy buckets:delete buckets:read' expires_in=119s
+09:36:36 executor=task task_id=48 step=3 instruction='copy bucket billing-exports to regulated-billing-exports' requested_by=ops-admin signer=spiffe://highway.lab/ns/migration/sa/planner-agent
+09:36:36 executor=tool_call task_id=48 step=3 tool=copy_bucket args='{"source": "billing-exports", "destination": "regulated-billing-exports"}'
+

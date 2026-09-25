@@ -1,0 +1,49 @@
+# The gate in front of mcp-tools. PEP (Python: verify permit + JWT-SVID) and
+# PDP (OPA sidecar: decide). OPA listens on localhost only: nobody else in the
+# namespace can query it or push it a new policy.
+apiVersion: v1
+kind: ServiceAccount
+metadata: {name: mcp-gateway, namespace: migration}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: mcp-gateway, namespace: migration}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: mcp-gateway}}
+  template:
+    metadata: {labels: {app: mcp-gateway}}
+    spec:
+      serviceAccountName: mcp-gateway
+      containers:
+        - name: gateway
+          image: highway-agent:dev
+          imagePullPolicy: IfNotPresent
+          command: ["python", "-m", "highway.mcp_gateway"]
+          ports: [{containerPort: 8080, name: http}]
+          readinessProbe:
+            httpGet: {path: /healthz, port: http}
+            periodSeconds: 3
+          env:
+            - {name: UPSTREAM_MCP_URL, value: "http://mcp-tools:8000/mcp"}
+            - {name: OPA_URL, value: "http://127.0.0.1:8181/v1/data/highway/mcp/decision"}
+          envFrom:
+            - configMapRef: {name: highway-permits}
+          volumeMounts: [{name: spire, mountPath: /run/spire/sockets, readOnly: true}]
+        - name: opa
+          image: openpolicyagent/opa:OPA_VERSION
+          args: ["run", "--server", "--addr=127.0.0.1:8181", "--disable-telemetry",
+                 "--log-level=error", "/policy/mcp.rego", "/policy/data.json"]
+          volumeMounts: [{name: policy, mountPath: /policy, readOnly: true}]
+      volumes:
+        - name: spire
+          hostPath: {path: /run/spire/agent-sockets, type: Directory}
+        - name: policy
+          configMap: {name: opa-policy}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: mcp-gateway, namespace: migration}
+spec:
+  selector: {app: mcp-gateway}
+  ports: [{port: 8080, targetPort: http, name: http}]

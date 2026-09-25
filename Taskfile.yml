@@ -4,6 +4,7 @@ version: "3"
 vars:
   P1: ./practice/part1/run.sh
   P2: ./practice/part2/run.sh
+  P3: ./practice/part3/run.sh
 
 tasks:
   default:
@@ -30,7 +31,24 @@ tasks:
   part2:poison:     {desc: "BREAK AGAIN: a validly signed bad instruction still runs", cmds: ["{{.P2}} poison"]}
   part2:all:        {desc: "run Part 2 end to end", cmds: ["{{.P2}} all"]}
   part2:capture:    {desc: "run Part 2 and save output to practice/part2/captured/k3d", cmds: ["{{.P2}} capture"]}
+  part2:doctor:     {desc: "SPIRE diagnostics: nodes, attested agents, entries, attestation log", cmds: ["{{.P2}} doctor"]}
   part2:cleanup:    {desc: "delete SPIRE and the migration namespace", cmds: ["./practice/part2/cleanup.sh"]}
+
+  # --- Part 3: Driving Permits (delegation, OPA at the MCP gateway, LLM gateway) ---
+  part3:up:      {desc: "Part 2 road + Keycloak + STS + MCP gateway (OPA) + LLM gateway", cmds: ["{{.P3}} up"]}
+  part3:key:     {desc: "BREAK: every agent pod carries the static LLM key", cmds: ["{{.P3}} key"]}
+  part3:llm-gw:  {desc: "FIX: key lives only in llm-gateway; agents present a JWT-SVID", cmds: ["{{.P3}} llm-gw"]}
+  part3:login:   {desc: "a human logs in to Keycloak (LAB_USER, default tester)", cmds: ["{{.P3}} login"]}
+  part3:permit:  {desc: "FIX: token exchange per hop (sub + act, scope, TTL); gateway checks every call", cmds: ["{{.P3}} permit"]}
+  part3:poison:  {desc: "Part 2's ending replayed: the signed delete is DENIED at the gateway", cmds: ["{{.P3}} poison"]}
+  part3:admin:   {desc: "ops-admin holds delete; the retention lock still DENIES", cmds: ["{{.P3}} admin"]}
+  part3:steal:   {desc: "rogue lifts a permit from the queue; useless without the actor's SVID", cmds: ["{{.P3}} steal"]}
+  part3:bypass:  {desc: "BREAK AGAIN: rogue skips the gateway and calls mcp-tools directly", cmds: ["{{.P3}} bypass"]}
+  part3:all:     {desc: "run Part 3 end to end", cmds: ["{{.P3}} all"]}
+  part3:capture: {desc: "run Part 3 and save output to practice/part3/captured/k3d", cmds: ["{{.P3}} capture"]}
+  part3:doctor:  {desc: "Part 3 diagnostics: pods, SPIRE entries, Keycloak login, OPA policy", cmds: ["{{.P3}} doctor"]}
+  part3:policy-test: {desc: "opa test the gateway policy (needs the opa CLI)", cmds: ["opa test -v practice/part3/policy"]}
+  part3:cleanup: {desc: "delete Keycloak, SPIRE and the migration namespace", cmds: ["./practice/part3/cleanup.sh"]}
 
   # --- Utilities ------------------------------------------------------------
   image:  {desc: "build highway-agent:dev and import into k3d", cmds: ["bash -c 'source scripts/lib.sh && image_build'"]}

@@ -1,0 +1,58 @@
+# Part 3 agents: same image, no LLM key. They reach the model through the LLM
+# gateway with a JWT-SVID. PERMITS / MCP_URL come from highway-permits (last
+# envFrom wins), so `run.sh permit` can flip them without editing this file.
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: planner-agent, namespace: migration}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: planner-agent}}
+  template:
+    metadata: {labels: {app: planner-agent}}
+    spec:
+      serviceAccountName: planner-agent
+      containers:
+        - name: planner
+          image: highway-agent:dev
+          imagePullPolicy: IfNotPresent
+          command: ["sleep", "infinity"]
+          env:
+            - {name: AGENT_NAME, value: planner-agent}
+            - {name: LLM_AUTH, value: svid}
+            - {name: LLM_BASE_URL, value: "http://llm-gateway:8080"}
+          envFrom:
+            - configMapRef: {name: highway-config}
+            - configMapRef: {name: highway-signing}
+            - configMapRef: {name: highway-permits}
+          volumeMounts: [{name: spire, mountPath: /run/spire/sockets, readOnly: true}]
+      volumes:
+        - name: spire
+          hostPath: {path: /run/spire/agent-sockets, type: Directory}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: executor-agent, namespace: migration}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: executor-agent}}
+  template:
+    metadata: {labels: {app: executor-agent}}
+    spec:
+      serviceAccountName: executor-agent
+      containers:
+        - name: executor
+          image: highway-agent:dev
+          imagePullPolicy: IfNotPresent
+          command: ["python", "-m", "highway.executor"]
+          env:
+            - {name: AGENT_NAME, value: executor-agent}
+            - {name: LLM_AUTH, value: svid}
+            - {name: LLM_BASE_URL, value: "http://llm-gateway:8080"}
+          envFrom:
+            - configMapRef: {name: highway-config}
+            - configMapRef: {name: highway-signing}
+            - configMapRef: {name: highway-permits}
+          volumeMounts: [{name: spire, mountPath: /run/spire/sockets, readOnly: true}]
+      volumes:
+        - name: spire
+          hostPath: {path: /run/spire/agent-sockets, type: Directory}

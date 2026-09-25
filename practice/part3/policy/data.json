@@ -1,0 +1,9 @@
+{
+  "lab": {
+    "actor_tools": {
+      "spiffe://highway.lab/ns/migration/sa/planner-agent": ["list_buckets", "read_inventory"],
+      "spiffe://highway.lab/ns/migration/sa/executor-agent": ["list_buckets", "read_inventory", "copy_bucket", "delete_bucket"]
+    },
+    "retention_locked": ["prod-archive"]
+  }
+}
