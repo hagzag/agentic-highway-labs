@@ -1,0 +1,6 @@
+
+==> Rogue lifts a permit from the queue and presents it at the gateway (executor paused)
+04:18:42 forge=stolen task_id=49 sub=tester act=planner-agent scope='buckets:copy buckets:read'
+04:18:43 forge=result target=http://mcp-gateway:8080/mcp result='refused: no actor token (JWT-SVID)'
+04:18:43 gateway=DENY method=server/discover tool=- sub=tester act=planner-agent caller=- task_id=49 reason='no actor token (JWT-SVID)'
+04:18:43 gateway=DENY method=initialize tool=- sub=tester act=planner-agent caller=- task_id=49 reason='no actor token (JWT-SVID)'

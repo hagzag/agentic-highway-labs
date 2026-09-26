@@ -1,0 +1,27 @@
+04:15:55 llm-gateway starting port=8080 mode=mock upstream=https://litellm.tikalk.dev key='0 chars'
+04:17:05 llm=ALLOW caller=planner-agent model=gpt-4o-mini mode=mock
+04:17:05 llm=ALLOW caller=executor-agent model=gpt-4o-mini mode=mock
+04:17:05 llm=ALLOW caller=executor-agent model=gpt-4o-mini mode=mock
+04:17:05 llm=ALLOW caller=executor-agent model=gpt-4o-mini mode=mock
+04:17:05 llm=ALLOW caller=executor-agent model=gpt-4o-mini mode=mock
+04:17:10 llm=DENY reason='no JWT-SVID'
+04:17:48 llm=ALLOW caller=planner-agent model=gpt-4o-mini mode=mock
+04:17:48 llm=ALLOW caller=executor-agent model=gpt-4o-mini mode=mock
+04:17:48 llm=ALLOW caller=executor-agent model=gpt-4o-mini mode=mock
+04:17:48 llm=ALLOW caller=executor-agent model=gpt-4o-mini mode=mock
+04:17:48 llm=ALLOW caller=executor-agent model=gpt-4o-mini mode=mock
+04:17:55 llm=ALLOW caller=planner-agent model=gpt-4o-mini mode=mock
+04:17:55 llm=ALLOW caller=executor-agent model=gpt-4o-mini mode=mock
+04:17:55 llm=ALLOW caller=executor-agent model=gpt-4o-mini mode=mock
+04:17:56 llm=ALLOW caller=executor-agent model=gpt-4o-mini mode=mock
+04:17:56 llm=ALLOW caller=executor-agent model=gpt-4o-mini mode=mock
+04:17:56 llm=ALLOW caller=executor-agent model=gpt-4o-mini mode=mock
+04:17:56 llm=ALLOW caller=executor-agent model=gpt-4o-mini mode=mock
+04:18:03 llm=ALLOW caller=planner-agent model=gpt-4o-mini mode=mock
+04:18:03 llm=ALLOW caller=executor-agent model=gpt-4o-mini mode=mock
+04:18:03 llm=ALLOW caller=executor-agent model=gpt-4o-mini mode=mock
+04:18:03 llm=ALLOW caller=executor-agent model=gpt-4o-mini mode=mock
+04:18:03 llm=ALLOW caller=executor-agent model=gpt-4o-mini mode=mock
+04:18:04 llm=ALLOW caller=executor-agent model=gpt-4o-mini mode=mock
+04:18:04 llm=ALLOW caller=executor-agent model=gpt-4o-mini mode=mock
+04:18:41 llm=ALLOW caller=planner-agent model=gpt-4o-mini mode=mock

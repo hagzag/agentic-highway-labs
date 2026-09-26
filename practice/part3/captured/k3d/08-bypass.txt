@@ -1,0 +1,6 @@
+
+==> BREAK AGAIN: the rogue skips the gate and calls mcp-tools directly
+04:18:52 forge=bypass target=http://mcp-tools:8000/mcp result='{"result": "deleted prod-archive"}'
+04:18:52 tool=delete_bucket bucket=prod-archive status=ok peer=rogue.migration.serviceaccount.identity.linkerd.cluster.local sub=-
+
+==> The permit is checked at the gate. Nothing forces traffic through the gate (Part 4).

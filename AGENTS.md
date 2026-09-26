@@ -48,7 +48,7 @@ scripts/local-smoke.sh start   # then run the planner; see practice/part1/README
 
 SPIRE note: there is no `WorkloadAPIServer` block (SPIRE crashes on it). Early PERMISSION_DENIED was entry-sync timing; `wait_svid` handles it.
 
-**Part 3** verified as local processes (SPIRE 1.15.3 unix attestation, Keycloak 26.7.4, OPA 1.20.1), see `practice/part3/captured/local/`. k3d capture pending:
+**Part 3** verified on k3d (clean capture 2026-09-26, `practice/part3/captured/k3d/`) and as local processes (`captured/local/`):
 - ✅ STS trims the planner's greedy scope to the human's roles (`dropped=buckets:delete`)
 - ✅ Multi-hop `act` chain: `executor-agent via planner-agent`; exp never extends across hops
 - ✅ Poisoned delete DENIED at the gateway (scope + retention lock); ops-admin still DENIED (retention lock)

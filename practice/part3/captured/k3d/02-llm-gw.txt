@@ -1,0 +1,22 @@
+
+==> FIX: agents lose the key; they reach the model through llm-gateway with a JWT-SVID
+planner-agent: SVID issued
+executor-agent: SVID issued
+executor-agent	
+llm-gateway	llm-credentials
+mcp-gateway	
+mcp-tools	
+planner-agent	
+redis	
+rogue	
+sts	
+executor-agent  LLM_API_KEY=<unset>  LLM_AUTH=svid -> http://llm-gateway:8080
+
+==> Rogue (no SVID) calls the LLM gateway
+rogue: 401 {"error":{"message":"no JWT-SVID"}}
+04:17:05 llm=ALLOW caller=planner-agent model=gpt-4o-mini mode=mock
+04:17:05 llm=ALLOW caller=executor-agent model=gpt-4o-mini mode=mock
+04:17:05 llm=ALLOW caller=executor-agent model=gpt-4o-mini mode=mock
+04:17:05 llm=ALLOW caller=executor-agent model=gpt-4o-mini mode=mock
+04:17:05 llm=ALLOW caller=executor-agent model=gpt-4o-mini mode=mock
+04:17:10 llm=DENY reason='no JWT-SVID'

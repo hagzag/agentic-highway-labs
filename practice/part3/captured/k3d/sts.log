@@ -1,0 +1,14 @@
+04:15:55 sts starting port=8080 issuer=http://sts.migration.svc.cluster.local:8080 idp=http://keycloak.idp.svc.cluster.local:8080/realms/highway ttl=120
+04:17:48 sts=issued sub=tester act=planner-agent scope='buckets:copy buckets:read' dropped=buckets:delete ttl=120 task_id=46
+04:17:48 sts=issued sub=tester act='executor-agent via planner-agent' scope='buckets:copy buckets:read' dropped=- ttl=120 task_id=46
+04:17:48 sts=issued sub=tester act='executor-agent via planner-agent' scope='buckets:copy buckets:read' dropped=- ttl=120 task_id=46
+04:17:54 sts=issued sub=tester act=planner-agent scope='buckets:copy buckets:read' dropped=buckets:delete ttl=120 task_id=46
+04:17:55 sts=issued sub=tester act=planner-agent scope='buckets:copy buckets:read' dropped=buckets:delete ttl=120 task_id=47
+04:17:55 sts=issued sub=tester act='executor-agent via planner-agent' scope='buckets:copy buckets:read' dropped=- ttl=120 task_id=47
+04:17:55 sts=issued sub=tester act='executor-agent via planner-agent' scope='buckets:copy buckets:read' dropped=- ttl=120 task_id=47
+04:17:56 sts=issued sub=tester act='executor-agent via planner-agent' scope='buckets:copy buckets:read' dropped=- ttl=119 task_id=47
+04:18:03 sts=issued sub=ops-admin act=planner-agent scope='buckets:copy buckets:delete buckets:read' dropped=- ttl=120 task_id=48
+04:18:03 sts=issued sub=ops-admin act='executor-agent via planner-agent' scope='buckets:copy buckets:delete buckets:read' dropped=- ttl=120 task_id=48
+04:18:03 sts=issued sub=ops-admin act='executor-agent via planner-agent' scope='buckets:copy buckets:delete buckets:read' dropped=- ttl=120 task_id=48
+04:18:03 sts=issued sub=ops-admin act='executor-agent via planner-agent' scope='buckets:copy buckets:delete buckets:read' dropped=- ttl=120 task_id=48
+04:18:41 sts=issued sub=tester act=planner-agent scope='buckets:copy buckets:read' dropped=buckets:delete ttl=120 task_id=49

@@ -1,0 +1,38 @@
+
+==> FIX: delegation ON. Planner and executor swap tokens at the STS; the gateway checks every call
+04:17:48 planner=permit task_id=46 sub=tester act=planner-agent scope='buckets:copy buckets:read' expires_in=120s
+04:17:48 planner=plan task_id=46 steps=2
+04:17:48 planner=step task_id=46 step=1 instruction='copy bucket customer-data to regulated-customer-data'
+04:17:48 broker=put task_id=46 step=1 signed_by=spiffe://highway.lab/ns/migration/sa/planner-agent
+04:17:48 planner=step task_id=46 step=2 instruction='copy bucket billing-exports to regulated-billing-exports'
+04:17:48 broker=put task_id=46 step=2 signed_by=spiffe://highway.lab/ns/migration/sa/planner-agent
+
+==> STS: what each hop was given (and what was dropped)
+04:17:48 sts=issued sub=tester act=planner-agent scope='buckets:copy buckets:read' dropped=buckets:delete ttl=120 task_id=46
+04:17:48 sts=issued sub=tester act='executor-agent via planner-agent' scope='buckets:copy buckets:read' dropped=- ttl=120 task_id=46
+04:17:48 sts=issued sub=tester act='executor-agent via planner-agent' scope='buckets:copy buckets:read' dropped=- ttl=120 task_id=46
+
+==> MCP gateway: every tool call, with sub, act and the proven caller
+04:17:48 gateway=ALLOW tool=read_inventory sub=tester act=planner-agent caller=planner-agent task_id=46 args={}
+04:17:48 gateway=ALLOW tool=copy_bucket sub=tester act='executor-agent via planner-agent' caller=executor-agent task_id=46 args='{"source": "customer-data", "destination": "regulated-customer-data"}'
+04:17:48 gateway=ALLOW tool=copy_bucket sub=tester act='executor-agent via planner-agent' caller=executor-agent task_id=46 args='{"source": "billing-exports", "destination": "regulated-billing-exports"}'
+
+==> mcp-tools: the calls arrive from the gateway, on behalf of tester
+04:17:48 tool=read_inventory status=ok peer=mcp-gateway.migration.serviceaccount.identity.linkerd.cluster.local sub=tester
+04:17:48 tool=copy_bucket bucket=customer-data destination=regulated-customer-data status=ok peer=mcp-gateway.migration.serviceaccount.identity.linkerd.cluster.local sub=tester
+04:17:48 tool=copy_bucket bucket=billing-exports destination=regulated-billing-exports status=ok peer=mcp-gateway.migration.serviceaccount.identity.linkerd.cluster.local sub=tester
+
+==> Inside the planner's permit (decoded)
+{
+  "iss": "http://sts.migration.svc.cluster.local:8080",
+  "sub": "tester",
+  "aud": "mcp-gateway",
+  "iat": 1790396274,
+  "exp": 1790396394,
+  "jti": "771bbdb3-12f9-4cb3-8290-98b9a235f84d",
+  "scope": "buckets:copy buckets:read",
+  "act": {
+    "sub": "spiffe://highway.lab/ns/migration/sa/planner-agent"
+  },
+  "task_id": "46"
+}

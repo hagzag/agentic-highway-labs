@@ -1,0 +1,97 @@
+
+==> Part 2 road first (cluster, Linkerd, SPIRE, signed tasks)
+
+==> Part 1 road first (cluster, agents, Linkerd)
+
+==> Creating k3d cluster 'highway'
+INFO[0000] Prep: Network                                
+INFO[0000] Created network 'k3d-highway'                
+INFO[0000] Created image volume k3d-highway-images      
+INFO[0000] Starting new tools node...                   
+INFO[0000] Starting node 'k3d-highway-tools'            
+INFO[0001] Creating node 'k3d-highway-server-0'         
+INFO[0001] Creating node 'k3d-highway-agent-0'          
+INFO[0001] Creating LoadBalancer 'k3d-highway-serverlb' 
+INFO[0001] Using the k3d-tools node to gather environment information 
+INFO[0001] Starting new tools node...                   
+INFO[0001] Starting node 'k3d-highway-tools'            
+INFO[0002] Starting cluster 'highway'                   
+INFO[0002] Starting servers...                          
+INFO[0002] Starting node 'k3d-highway-server-0'         
+INFO[0007] Starting agents...                           
+INFO[0007] Starting node 'k3d-highway-agent-0'          
+INFO[0018] Starting helpers...                          
+INFO[0018] Starting node 'k3d-highway-serverlb'         
+INFO[0025] Injecting records for hostAliases (incl. host.k3d.internal) and for 4 network members into CoreDNS configmap... 
+INFO[0027] Cluster 'highway' created successfully!      
+INFO[0027] You can now use it like this:                
+kubectl cluster-info
+
+==> Building highway-agent:dev and importing it into k3d
+sha256:dcccab7fb13cdfbd62457383fcc79f6f9ff605b85a984d490c19c7dc23d6fdc8
+
+==> Deploying planner, executor, mcp-tools and redis (no mesh yet)
+NAME                              READY   STATUS    RESTARTS   AGE   IP          NODE                   NOMINATED NODE   READINESS GATES
+executor-agent-677c8fbd77-2t528   1/1     Running   0          35s   10.42.0.6   k3d-highway-server-0   <none>           <none>
+mcp-tools-75c9d85785-4zjqb        1/1     Running   0          35s   10.42.2.5   k3d-highway-agent-0    <none>           <none>
+planner-agent-b4b796cc7-b7pc4     1/1     Running   0          35s   10.42.0.7   k3d-highway-server-0   <none>           <none>
+redis-db89df655-4rsld             1/1     Running   0          35s   10.42.2.6   k3d-highway-agent-0    <none>           <none>
+
+==> Installing Gateway API v1.5.1 CRDs (Linkerd needs them)
+
+==> Installing Linkerd control plane
+Rendering Linkerd CRDs...
+Next, run `linkerd install | kubectl apply -f -` to install the control plane.
+
+
+==> Paving the road: inject the proxy into every pod in 'migration'
+I0926 07:14:18.496870   44543 warnings.go:107] "Warning: v1 Endpoints is deprecated in v1.33+; use discovery.k8s.io/v1 EndpointSlice"
+linkerd check --proxy: ok
+NAME                              READY   STATUS    RESTARTS   AGE
+executor-agent-85749585b7-5kw2p   2/2     Running   0          41s
+mcp-tools-5bfd75bcb6-27fv2        2/2     Running   0          50s
+planner-agent-657d8fbf8c-95gns    2/2     Running   0          41s
+redis-b59679788-86rbd             2/2     Running   0          50s
+
+==> Installing SPIRE 1.15.3 (server + agent DaemonSet)
+
+==> Registering identities: node alias + one entry per agent
+SPIFFE ID               : spiffe://highway.lab/ns/migration/sa/executor-agent
+Selector                : k8s:ns:migration
+Selector                : k8s:sa:executor-agent
+SPIFFE ID               : spiffe://highway.lab/ns/migration/sa/mcp-tools
+Selector                : k8s:ns:migration
+Selector                : k8s:sa:mcp-tools
+SPIFFE ID               : spiffe://highway.lab/ns/migration/sa/planner-agent
+Selector                : k8s:ns:migration
+Selector                : k8s:sa:planner-agent
+
+==> Redeploying agents with the Workload API socket (signing OFF)
+planner-agent: SVID issued
+executor-agent: SVID issued
+
+==> Keycloak 26.7.4: the humans' identity provider (realm highway)
+
+==> STS, MCP gateway (+ OPA 1.20.1) and LLM gateway
+SPIFFE ID               : spiffe://highway.lab/ns/migration/sa/executor-agent
+SPIFFE ID               : spiffe://highway.lab/ns/migration/sa/llm-gateway
+SPIFFE ID               : spiffe://highway.lab/ns/migration/sa/mcp-gateway
+SPIFFE ID               : spiffe://highway.lab/ns/migration/sa/mcp-tools
+SPIFFE ID               : spiffe://highway.lab/ns/migration/sa/planner-agent
+SPIFFE ID               : spiffe://highway.lab/ns/migration/sa/sts
+
+==> mcp-tools logs sub= from now on; agents restart with signing ON
+sts: SVID issued
+mcp-gateway: SVID issued
+llm-gateway: SVID issued
+NAME                             READY   STATUS    RESTARTS   AGE
+executor-agent-fc9c59478-xmdpp   2/2     Running   0          35s
+llm-gateway-8648968dd9-9x5r8     2/2     Running   0          36s
+mcp-gateway-5db89ddc9b-6qlwf     3/3     Running   0          36s
+mcp-tools-86464c65ff-hsbwv       2/2     Running   0          35s
+planner-agent-6fddddccd8-zk2dl   2/2     Running   0          35s
+redis-b59679788-86rbd            2/2     Running   0          2m58s
+rogue-8585747984-x4wqx           2/2     Running   0          71s
+sts-6846df9447-4gbzk             2/2     Running   0          36s
+NAME                        READY   STATUS    RESTARTS   AGE
+keycloak-7fc87bfd6b-qdbcc   2/2     Running   0          36s

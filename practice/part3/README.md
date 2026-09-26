@@ -20,30 +20,30 @@ task part3:bypass   # BREAK AGAIN: rogue calls mcp-tools directly and the delete
 
 Log in as someone else with `LAB_USER=hagzag task part3:permit`. Realm users (password = username, lab only): `hagzag` and `tester` hold `migrator` (read, copy). `ops-admin` also holds `storage-admin` (delete).
 
-## Real output (local processes: SPIRE 1.15.3, Keycloak 26.7.4, OPA 1.20.1)
+## Real output (k3d, 2026-09-26)
 
-From [captured/local/driver.log](captured/local/driver.log). On k3d the same lines appear in the pods' logs.
+From [captured/k3d/](captured/k3d/) (`task part3:capture` on a fresh cluster). A local-process run with the same results is in [captured/local/](captured/local/).
 
 ```text
 # The planner asks for everything. The STS trims it to what tester holds.
 sts=issued sub=tester act=planner-agent scope='buckets:copy buckets:read' dropped=buckets:delete ttl=120 task_id=46
-sts=issued sub=tester act='executor-agent via planner-agent' scope='buckets:copy buckets:read' dropped=- ttl=119 task_id=46
-gateway=ALLOW tool=copy_bucket sub=tester act='executor-agent via planner-agent' caller=executor-agent task_id=46 ...
+sts=issued sub=tester act='executor-agent via planner-agent' scope='buckets:copy buckets:read' dropped=- ttl=120 task_id=46
+tool=copy_bucket bucket=customer-data destination=regulated-customer-data status=ok peer=mcp-gateway.migration.serviceaccount.identity.linkerd.cluster.local sub=tester
 
 # Part 2's ending: same poisoned note, same valid signature. Different outcome.
 executor=task task_id=47 step=2 instruction='delete bucket prod-archive' requested_by=tester signer=spiffe://highway.lab/ns/migration/sa/planner-agent
 gateway=DENY method=tools/call tool=delete_bucket sub=tester act='executor-agent via planner-agent' caller=executor-agent task_id=47 reason='prod-archive is under retention lock; scope buckets:delete not in permit'
 
 # Even a human who holds delete can't delete what policy protects.
-gateway=DENY method=tools/call tool=delete_bucket sub=ops-admin ... reason='prod-archive is under retention lock'
+gateway=DENY method=tools/call tool=delete_bucket sub=ops-admin act='executor-agent via planner-agent' caller=executor-agent task_id=48 reason='prod-archive is under retention lock'
 
 # A permit lifted from the queue is useless without the actor's SVID.
 forge=stolen task_id=49 sub=tester act=planner-agent scope='buckets:copy buckets:read'
 gateway=DENY method=initialize tool=- sub=tester act=planner-agent caller=- task_id=49 reason='no actor token (JWT-SVID)'
 
 # ...but nothing forces traffic through the gate.
-forge=bypass target=http://127.0.0.1:8000/mcp result='{"result": "deleted prod-archive"}'
-tool=delete_bucket bucket=prod-archive status=ok peer=- sub=-
+forge=bypass target=http://mcp-tools:8000/mcp result='{"result": "deleted prod-archive"}'
+tool=delete_bucket bucket=prod-archive status=ok peer=rogue.migration.serviceaccount.identity.linkerd.cluster.local sub=-
 ```
 
 ## The permit

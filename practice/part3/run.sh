@@ -22,7 +22,8 @@ plan3() {  # plan3 <task-id> [user]
 }
 
 wait_svid() {  # wait_svid deploy:container ...
-  local py='from spiffe import WorkloadApiClient as W; W().fetch_jwt_svid(audience={"probe"})'
+  # Same code path the services use (highway.svid), so the socket default comes from config.
+  local py='from highway import svid; svid.token("probe")'
   for pair in "$@"; do
     for i in $(seq 30); do
       kubectl -n "$NS" exec "deploy/${pair%:*}" -c "${pair#*:}" -- python -c "$py" >/dev/null 2>&1 \
@@ -139,9 +140,9 @@ poison() {
   tools_admin poison >/dev/null
   plan3 47
   sleep 6
-  show sts sts 15 'sts=issued.*act=planner-agent '
-  show executor-agent executor 15 'executor=(task|denied)'
-  show mcp-gateway gateway 15 'gateway=DENY'
+  show sts sts 15 'sts=issued.*act=planner-agent .*task_id=47'
+  show executor-agent executor 15 'executor=(task|denied).*task_id=47'
+  show mcp-gateway gateway 15 'gateway=DENY.*task_id=47'
   show mcp-tools mcp-tools 15 'tool=delete_bucket'
   if tools_admin state | grep -q '"prod-archive"'; then echo "prod-archive: still there"; else echo "prod-archive: GONE"; fi
 }
@@ -152,8 +153,8 @@ admin() {
   tools_admin poison >/dev/null
   plan3 48 ops-admin
   sleep 6
-  show sts sts 15 'sts=issued.*act=planner-agent '
-  show mcp-gateway gateway 15 'gateway=DENY'
+  show sts sts 15 'sts=issued.*act=planner-agent .*task_id=48'
+  show mcp-gateway gateway 15 'gateway=DENY.*task_id=48'
   echo "Scope is necessary, not sufficient: some resources no permit can touch."
 }
 
@@ -205,15 +206,27 @@ capture() {
   permit      2>&1 | tee "$out/04-permit.txt"
   poison      2>&1 | tee "$out/05-poison.txt"
   admin       2>&1 | tee "$out/06-admin.txt"
+  applogs executor-agent executor > "$out/executor.log"   # before steal: it restarts the executor
   steal       2>&1 | tee "$out/07-steal.txt"
   bypass      2>&1 | tee "$out/08-bypass.txt"
   applogs sts sts > "$out/sts.log"
   applogs mcp-gateway gateway > "$out/mcp-gateway.log"
   applogs llm-gateway llm-gateway > "$out/llm-gateway.log"
-  applogs executor-agent executor > "$out/executor.log"
   applogs mcp-tools mcp-tools > "$out/mcp-tools.log"
   say "Captured to $out"
 }
+
+# Steps after `up` need the Part 3 image and deployments. Running one on a Part 2
+# cluster fails deep inside a pod ("No module named highway.login"); say why instead.
+preflight() {
+  if ! kubectl -n "$NS" get deploy sts mcp-gateway llm-gateway >/dev/null 2>&1 \
+     || ! planner python -c 'import highway.login' >/dev/null 2>&1; then
+    echo "Part 3 isn't installed on this cluster (or the image predates it)." >&2
+    echo "Run: task part3:up   (rebuilds highway-agent:dev, deploys Keycloak, STS and gateways)" >&2
+    exit 1
+  fi
+}
+case "${1:-all}" in key|llm-gw|login|permit|poison|admin|steal|bypass) preflight ;; esac
 
 case "${1:-all}" in
   up) up ;; key) key ;; llm-gw) llm_gw ;; login) login ;; permit) permit ;; poison) poison ;;

@@ -1,0 +1,13 @@
+
+==> BREAK: every agent pod carries the borrowed LLM key
+executor-agent	llm-credentials
+llm-gateway	llm-credentials
+mcp-gateway	
+mcp-tools	
+planner-agent	llm-credentials
+redis	
+rogue	
+sts	
+planner-agent   LLM_API_KEY=… (0 chars) -> https://litellm.tikalk.dev
+executor-agent  LLM_API_KEY=… (0 chars) -> https://litellm.tikalk.dev
+Anyone who can exec into either pod, or read its env, walks away with it.

@@ -1,0 +1,16 @@
+
+==> A human logs in: tester @ Keycloak realm highway (password grant, lab only)
+{
+  "iss": "http://keycloak.idp.svc.cluster.local:8080/realms/highway",
+  "sub": "5fae8164-3a4f-4ba4-82c6-51825c0a2331",
+  "preferred_username": "tester",
+  "azp": "highway-cli",
+  "realm_access": {
+    "roles": [
+      "migrator"
+    ]
+  },
+  "scope": "openid profile email",
+  "exp": 1790396531,
+  "iat": 1790396231
+}

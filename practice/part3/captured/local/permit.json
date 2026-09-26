@@ -1,0 +1,16 @@
+{
+  "iss": "http://127.0.0.1:8090",
+  "sub": "tester",
+  "aud": "mcp-gateway",
+  "iat": 1790322279,
+  "exp": 1790322398,
+  "jti": "d8c5b93f-1471-494b-ae5f-22ab76026b17",
+  "scope": "buckets:copy buckets:read",
+  "act": {
+    "sub": "spiffe://highway.lab/ns/migration/sa/executor-agent",
+    "act": {
+      "sub": "spiffe://highway.lab/ns/migration/sa/planner-agent"
+    }
+  },
+  "task_id": "46"
+}
