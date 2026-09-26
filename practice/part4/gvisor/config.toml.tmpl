@@ -1,0 +1,5 @@
+{{ template "base" . }}
+
+# containerd 1.7 (k3s config v2): register runsc as a runtime handler.
+[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runsc]
+  runtime_type = "io.containerd.runsc.v1"

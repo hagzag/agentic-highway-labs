@@ -1,0 +1,6 @@
+
+[1;36m==> Installing gVisor on the k3d node (best-effort; needs docker on the host)[0m
+==> downloading gVisor (aarch64, release/latest) on the host
+   individual binaries not found; trying gvisor.tar.zst
+curl: (56) The requested URL returned error: 404
+gVisor install failed; fence will fall back to runc

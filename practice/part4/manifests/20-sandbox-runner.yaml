@@ -1,0 +1,36 @@
+# The high-blast-radius tool: run_script, behind the same MCP gateway as mcp-tools.
+# Deployed FIRST without a fence (runc, SA token auto-mounted, egress open) so the
+# break is real. run.sh's fence step swaps in 40-runner-fenced.yaml.
+apiVersion: v1
+kind: ServiceAccount
+metadata: {name: sandbox-runner, namespace: migration}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: sandbox-runner, namespace: migration}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: sandbox-runner}}
+  template:
+    metadata: {labels: {app: sandbox-runner}}
+    spec:
+      serviceAccountName: sandbox-runner
+      containers:
+        - name: sandbox-runner
+          image: highway-agent:dev
+          imagePullPolicy: IfNotPresent
+          command: ["python", "-m", "highway.runner"]
+          ports: [{containerPort: 8000, name: http}]
+          readinessProbe:
+            httpGet: {path: /healthz, port: http}
+            periodSeconds: 3
+          env:
+            - {name: AGENT_NAME, value: sandbox-runner}
+            - {name: SINK_URL, value: "http://sink.internet.svc.cluster.local:9000"}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: sandbox-runner, namespace: migration}
+spec:
+  selector: {app: sandbox-runner}
+  ports: [{port: 8000, targetPort: http, name: http}]

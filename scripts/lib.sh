@@ -9,6 +9,7 @@ export GATEWAY_API_VERSION="${GATEWAY_API_VERSION:-v1.5.1}" # Linkerd 2.20 accep
 export SPIRE_VERSION="${SPIRE_VERSION:-1.15.3}"
 export KEYCLOAK_VERSION="${KEYCLOAK_VERSION:-26.7.4}"         # verified 2026-09-25
 export OPA_VERSION="${OPA_VERSION:-1.20.1}"                   # verified 2026-09-25
+export GVISOR_CHANNEL="${GVISOR_CHANNEL:-release/latest}"     # Part 4: gVisor ships a rolling release, no semver pin
 export NETSHOOT_IMAGE="${NETSHOOT_IMAGE:-nicolaka/netshoot:latest}"
 export IMAGE="highway-agent:dev"
 export NS=migration

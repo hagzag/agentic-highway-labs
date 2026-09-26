@@ -9,9 +9,8 @@ data:
   STS_URL: http://sts:8080
   STS_ISSUER: http://sts.migration.svc.cluster.local:8080
   KEYCLOAK_ISSUER: http://keycloak.idp.svc.cluster.local:8080/realms/highway
-  PERMIT_SCOPES: buckets:read buckets:copy buckets:delete
+  PERMIT_SCOPES: buckets:read buckets:copy buckets:delete scripts:run
   PERMIT_TTL: "120"
-  SPIFFE_ENDPOINT_SOCKET: unix:///run/spire/sockets/agent.sock
 ---
 # The permit office: RFC 8693 token exchange. Knows Keycloak's keys and SPIRE's.
 apiVersion: v1

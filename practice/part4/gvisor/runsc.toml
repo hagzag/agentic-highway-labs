@@ -1,0 +1,5 @@
+# gVisor platform. systrap works without KVM, which is the common case inside a
+# Docker Desktop / Colima VM on a Mac. Switch to "kvm" only on a bare-metal Linux
+# node with /dev/kvm.
+[runsc_config]
+  platform = "systrap"

@@ -11,6 +11,7 @@ tool_scope := {
 	"read_inventory": "buckets:read",
 	"copy_bucket": "buckets:copy",
 	"delete_bucket": "buckets:delete",
+	"run_script": "scripts:run",
 }
 
 scopes := split(input.permit.scope, " ")

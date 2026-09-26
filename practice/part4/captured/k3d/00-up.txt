@@ -1,0 +1,107 @@
+
+[1;36m==> Part 3 road first (Keycloak, SPIRE, STS, gateways) with delegation ON[0m
+
+[1;36m==> Part 2 road first (cluster, Linkerd, SPIRE, signed tasks)[0m
+
+[1;36m==> Part 1 road first (cluster, agents, Linkerd)[0m
+
+[1;36m==> Creating k3d cluster 'highway'[0m
+[36mINFO[0m[0000] Prep: Network                                
+[36mINFO[0m[0000] Created network 'k3d-highway'                
+[36mINFO[0m[0000] Created image volume k3d-highway-images      
+[36mINFO[0m[0000] Starting new tools node...                   
+[36mINFO[0m[0000] Starting node 'k3d-highway-tools'            
+[36mINFO[0m[0001] Creating node 'k3d-highway-server-0'         
+[36mINFO[0m[0001] Creating node 'k3d-highway-agent-0'          
+[36mINFO[0m[0001] Creating LoadBalancer 'k3d-highway-serverlb' 
+[36mINFO[0m[0001] Using the k3d-tools node to gather environment information 
+[36mINFO[0m[0001] Starting new tools node...                   
+[36mINFO[0m[0001] Starting node 'k3d-highway-tools'            
+[36mINFO[0m[0002] Starting cluster 'highway'                   
+[36mINFO[0m[0002] Starting servers...                          
+[36mINFO[0m[0002] Starting node 'k3d-highway-server-0'         
+[36mINFO[0m[0005] Starting agents...                           
+[36mINFO[0m[0005] Starting node 'k3d-highway-agent-0'          
+[36mINFO[0m[0016] Starting helpers...                          
+[36mINFO[0m[0016] Starting node 'k3d-highway-serverlb'         
+[36mINFO[0m[0022] Injecting records for hostAliases (incl. host.k3d.internal) and for 4 network members into CoreDNS configmap... 
+[36mINFO[0m[0024] Cluster 'highway' created successfully!      
+[36mINFO[0m[0025] You can now use it like this:                
+kubectl cluster-info
+
+[1;36m==> Building highway-agent:dev and importing it into k3d[0m
+sha256:ea529e6bdb0da731c50c42e5311fae8816b179aeb80e54930cf2381c443fdb21
+
+[1;36m==> Deploying planner, executor, mcp-tools and redis (no mesh yet)[0m
+NAME                             READY   STATUS    RESTARTS   AGE   IP          NODE                   NOMINATED NODE   READINESS GATES
+executor-agent-8fd8fb7df-sdfh2   1/1     Running   0          41s   10.42.0.6   k3d-highway-server-0   <none>           <none>
+mcp-tools-6bcc88449c-gnk8k       1/1     Running   0          41s   10.42.2.6   k3d-highway-agent-0    <none>           <none>
+planner-agent-56c978866f-sk6kd   1/1     Running   0          41s   10.42.2.5   k3d-highway-agent-0    <none>           <none>
+redis-6c97fbb855-df2wp           1/1     Running   0          41s   10.42.0.7   k3d-highway-server-0   <none>           <none>
+
+[1;36m==> Installing Gateway API v1.5.1 CRDs (Linkerd needs them)[0m
+
+[1;36m==> Installing Linkerd control plane[0m
+Rendering Linkerd CRDs...
+Next, run `linkerd install | kubectl apply -f -` to install the control plane.
+
+
+[1;36m==> Paving the road: inject the proxy into every pod in 'migration'[0m
+I0926 20:31:06.296175   31277 warnings.go:107] "Warning: v1 Endpoints is deprecated in v1.33+; use discovery.k8s.io/v1 EndpointSlice"
+linkerd check --proxy: ok
+NAME                              READY   STATUS    RESTARTS   AGE
+executor-agent-6fcdcfb6bf-49tx2   2/2     Running   0          41s
+mcp-tools-6c946bccdc-vg8j7        2/2     Running   0          46s
+planner-agent-78ccb44485-2pj7p    2/2     Running   0          41s
+redis-696bf59c4f-vhn66            2/2     Running   0          46s
+
+[1;36m==> Installing SPIRE 1.15.3 (server + agent DaemonSet)[0m
+
+[1;36m==> Registering identities: node alias + one entry per agent[0m
+SPIFFE ID               : spiffe://highway.lab/ns/migration/sa/executor-agent
+Selector                : k8s:ns:migration
+Selector                : k8s:sa:executor-agent
+SPIFFE ID               : spiffe://highway.lab/ns/migration/sa/mcp-tools
+Selector                : k8s:ns:migration
+Selector                : k8s:sa:mcp-tools
+SPIFFE ID               : spiffe://highway.lab/ns/migration/sa/planner-agent
+Selector                : k8s:ns:migration
+Selector                : k8s:sa:planner-agent
+
+[1;36m==> Redeploying agents with the Workload API socket (signing OFF)[0m
+planner-agent: SVID issued
+executor-agent: SVID issued
+
+[1;36m==> Keycloak 26.7.4: the humans' identity provider (realm highway)[0m
+
+[1;36m==> STS, MCP gateway (+ OPA 1.20.1) and LLM gateway[0m
+SPIFFE ID               : spiffe://highway.lab/ns/migration/sa/executor-agent
+SPIFFE ID               : spiffe://highway.lab/ns/migration/sa/llm-gateway
+SPIFFE ID               : spiffe://highway.lab/ns/migration/sa/mcp-gateway
+SPIFFE ID               : spiffe://highway.lab/ns/migration/sa/mcp-tools
+SPIFFE ID               : spiffe://highway.lab/ns/migration/sa/planner-agent
+SPIFFE ID               : spiffe://highway.lab/ns/migration/sa/sts
+
+[1;36m==> mcp-tools logs sub= from now on; agents restart with signing ON[0m
+sts: SVID issued
+mcp-gateway: SVID issued
+llm-gateway: SVID issued
+NAME                              READY   STATUS    RESTARTS   AGE
+executor-agent-6b7dcbc8b6-d6rjq   2/2     Running   0          35s
+llm-gateway-8648968dd9-pwxtm      2/2     Running   0          36s
+mcp-gateway-5db89ddc9b-9hctv      3/3     Running   0          36s
+mcp-tools-7c6c9b9978-mpn7x        2/2     Running   0          35s
+planner-agent-5b8fb86664-5gd24    2/2     Running   0          35s
+redis-696bf59c4f-vhn66            2/2     Running   0          2m56s
+rogue-8585747984-v494j            2/2     Running   0          71s
+sts-6846df9447-ctlvj              2/2     Running   0          36s
+NAME                        READY   STATUS    RESTARTS   AGE
+keycloak-7fc87bfd6b-z7n4p   2/2     Running   0          36s
+
+[1;36m==> The internet (sink) and the sandbox-runner (run_script), no fence yet[0m
+
+[1;36m==> Teach the gateway where run_script lives; restart agents with permits ON[0m
+NAME                              READY   STATUS    RESTARTS   AGE
+sandbox-runner-68b9b486f5-ms6k2   2/2     Running   0          34s
+NAME                    READY   STATUS    RESTARTS   AGE
+sink-567b86fb96-m5jmw   1/1     Running   0          35s

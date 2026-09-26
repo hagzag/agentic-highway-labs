@@ -37,3 +37,14 @@ test_wrong_presenter if {
 	d := mcp.decision with input as i
 	"caller planner-agent is not the permit's actor executor-agent" in d.deny
 }
+
+# --- Part 4: run_script ------------------------------------------------------
+test_run_script_allowed if {
+	mcp.decision.allow with input as call("run_script", {"language": "python", "code": "print(1)"}, "buckets:read scripts:run")
+}
+
+test_run_script_needs_scope if {
+	d := mcp.decision with input as call("run_script", {"code": "print(1)"}, "buckets:read buckets:copy")
+	not d.allow
+	"scope scripts:run not in permit" in d.deny
+}

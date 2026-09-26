@@ -1,0 +1,8 @@
+{{ template "base" . }}
+
+# containerd 2.x (k3s config v3): register runsc as a runtime handler.
+[plugins.'io.containerd.cri.v1.runtime'.containerd.runtimes.runsc]
+  runtime_type = 'io.containerd.runsc.v1'
+[plugins.'io.containerd.cri.v1.runtime'.containerd.runtimes.runsc.options]
+  TypeUrl = 'io.containerd.runsc.v1.options'
+  ConfigPath = '/etc/containerd/runsc.toml'

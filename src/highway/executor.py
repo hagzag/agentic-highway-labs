@@ -38,6 +38,9 @@ async def handle(task: dict, permit: str | None) -> None:
             calls = reply.get("tool_calls") or []
             messages.append({"role": "assistant", "content": reply.get("content"), "tool_calls": calls or None})
             if not calls:
+                if _ == 0:  # first turn returned no tool call: surface what the model said
+                    log("executor=no_call", task_id=task["task_id"], step=task["step"],
+                        reply=str(reply.get("content"))[:120])
                 break
             for call in calls:
                 name = call["function"]["name"]

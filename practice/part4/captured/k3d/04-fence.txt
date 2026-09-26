@@ -1,0 +1,10 @@
+
+[1;36m==> FENCE: NetworkPolicy (gateway is the only road; runner can't phone home)[0m
+
+[1;36m==> FENCE: runner with no SA token, runtime=runc[0m
+note: runsc not available on this node; runner is on runc. NetworkPolicy + no-token still apply.
+
+[1;36m==> Waiting for kube-router to program the new pod's NetworkPolicy (startup window)[0m
+egress: still REACH after 30s. kube-router egress can be racy on k3d + a mesh;
+        the dropped token neutralises the exfil regardless. For reliable egress
+        use a CNI like Cilium/Calico or an egress gateway.

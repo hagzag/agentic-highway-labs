@@ -1,0 +1,43 @@
+# The fence. Three NetworkPolicies (kube-router enforces them on k3s) that turn
+# the namespace from allow-all into least-connectivity. The runtime + token part
+# of the fence is in 40-runner-fenced.yaml.
+
+# 1. The gateway is the only road to mcp-tools. Closes Part 3's bypass
+#    (rogue -> mcp-tools:8000). Probes from the node/kubelet are host traffic and
+#    are not filtered by kube-router, so readiness still works.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: mcp-tools-ingress, namespace: migration}
+spec:
+  podSelector: {matchLabels: {app: mcp-tools}}
+  policyTypes: [Ingress]
+  # No port match: with Linkerd, cross-pod traffic arrives on the proxy's inbound
+  # port (4143), not 8000, so restricting to 8000 would block the gateway too.
+  # Identity is by pod label instead — the rogue (app=rogue) is still shut out.
+  ingress:
+    - from: [{podSelector: {matchLabels: {app: mcp-gateway}}}]
+---
+# 2. The runner can't phone home. Default-deny egress, then allow only DNS and the
+#    Linkerd control plane (so the mesh proxy keeps its identity). The sink and the
+#    kube API are not in the allow-list, so the exfil script's egress is dropped.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: runner-egress, namespace: migration}
+spec:
+  podSelector: {matchLabels: {app: sandbox-runner}}
+  policyTypes: [Egress]
+  egress:
+    - ports: [{protocol: UDP, port: 53}, {protocol: TCP, port: 53}]   # DNS to anywhere
+    - to: [{namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: linkerd}}}]
+---
+# 3. Nothing in migration may open new connections into the internet namespace.
+#    Belt-and-braces with policy 2: even a pod without an egress policy is stopped
+#    at the sink's door.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: sink-ingress, namespace: internet}
+spec:
+  podSelector: {matchLabels: {app: sink}}
+  policyTypes: [Ingress]
+  ingress:
+    - from: [{namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: internet}}}]

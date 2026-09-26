@@ -5,6 +5,7 @@ vars:
   P1: ./practice/part1/run.sh
   P2: ./practice/part2/run.sh
   P3: ./practice/part3/run.sh
+  P4: ./practice/part4/run.sh
 
 tasks:
   default:
@@ -49,6 +50,19 @@ tasks:
   part3:doctor:  {desc: "Part 3 diagnostics: pods, SPIRE entries, Keycloak login, OPA policy", cmds: ["{{.P3}} doctor"]}
   part3:policy-test: {desc: "opa test the gateway policy (needs the opa CLI)", cmds: ["opa test -v practice/part3/policy"]}
   part3:cleanup: {desc: "delete Keycloak, SPIRE and the migration namespace", cmds: ["./practice/part3/cleanup.sh"]}
+
+  # --- Part 4: The Closed Track (sandbox + egress fence + blast-radius report) ---
+  part4:up:          {desc: "Part 3 road + sink (internet) + sandbox-runner (run_script), no fence", cmds: ["{{.P4}} up"]}
+  part4:probe-before: {desc: "blast-radius matrix before the fence", cmds: ["{{.P4}} probe-before"]}
+  part4:break:       {desc: "BREAK: bypass still works; poisoned run_script steals the SA token to the sink", cmds: ["{{.P4}} break"]}
+  part4:gvisor:      {desc: "best-effort gVisor (runsc) install on the k3d node", cmds: ["{{.P4}} gvisor"]}
+  part4:fence:       {desc: "FENCE: NetworkPolicy + no SA token + gVisor runtime", cmds: ["{{.P4}} fence"]}
+  part4:verify:      {desc: "the bypass is dead and the exfil finds nothing to steal or send", cmds: ["{{.P4}} verify"]}
+  part4:probe-after: {desc: "blast-radius matrix after the fence", cmds: ["{{.P4}} probe-after"]}
+  part4:all:         {desc: "run Part 4 end to end", cmds: ["{{.P4}} all"]}
+  part4:capture:     {desc: "run Part 4 and save output to practice/part4/captured/k3d", cmds: ["{{.P4}} capture"]}
+  part4:doctor:      {desc: "Part 4 diagnostics: pods, netpol, runtime, runner/sink logs", cmds: ["{{.P4}} doctor"]}
+  part4:cleanup:     {desc: "delete the internet ns, sandbox-runner, netpol, then Part 3", cmds: ["./practice/part4/cleanup.sh"]}
 
   # --- Utilities ------------------------------------------------------------
   image:  {desc: "build highway-agent:dev and import into k3d", cmds: ["bash -c 'source scripts/lib.sh && image_build'"]}

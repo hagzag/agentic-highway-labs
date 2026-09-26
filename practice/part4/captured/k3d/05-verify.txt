@@ -1,0 +1,8 @@
+
+[1;36m==> VERIFY 1: the bypass is now dead — rogue can't reach mcp-tools[0m
+17:36:32 forge=bypass target=http://mcp-tools:8000/mcp result='refused: Server returned an error response'
+
+[1;36m==> VERIFY 2: the same poisoned run_script now finds nothing to steal and nowhere to send it[0m
+
+[1;36m==> Sink log unchanged — no 'received' line for this run[0m
+17:34:39 sink=received bytes=1230 src=10.42.0.20 preview=eyJhbGciOiJSUzI1NiIsImtpZCI6IjVJU0tGTGRTaEkzbkQ1RUgzSDBjNHZmZ1pmQjlBSTJsMXNTUERu

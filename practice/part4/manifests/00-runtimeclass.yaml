@@ -1,0 +1,8 @@
+# gVisor RuntimeClass. Pods that set runtimeClassName: gvisor run under runsc,
+# a user-space kernel, instead of sharing the host kernel via runc.
+# Requires runsc + a containerd runtime handler on the node (see ../gvisor/).
+apiVersion: node.k8s.io/v1
+kind: RuntimeClass
+metadata:
+  name: gvisor
+handler: runsc

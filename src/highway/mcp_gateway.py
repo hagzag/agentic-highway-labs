@@ -25,6 +25,9 @@ from .log import log
 from .permits import act_chain
 
 UPSTREAM = os.environ.get("UPSTREAM_MCP_URL", "http://mcp-tools:8000/mcp")
+# Part 4: run_script lives in the sandbox-runner, a different MCP server. Same gate.
+RUNNER = os.environ.get("UPSTREAM_RUNNER_URL", "")
+TOOL_UPSTREAM = {"run_script": RUNNER} if RUNNER else {}
 OPA_URL = os.environ.get("OPA_URL", "http://127.0.0.1:8181/v1/data/highway/mcp/decision")
 AUDIENCE = "mcp-gateway"
 HOP = {"host", "content-length", "connection", "authorization", "actor-token", "transfer-encoding"}
@@ -93,10 +96,31 @@ async def mcp(request: Request) -> Response:
     if method == "tools/call":
         log("gateway=ALLOW", tool=tool, **who, args=json.dumps(args))
 
+    # A tool served by a different MCP server (run_script -> sandbox-runner) is brokered
+    # with a real MCP client: the runner is stateless and needs the initialize handshake,
+    # which this session did against mcp-tools, not the runner. Everything else is a
+    # transparent proxy to mcp-tools.
+    dsub = {"x-highway-sub": who["sub"], "x-highway-act": who["act"]}
+    if tool in TOOL_UPSTREAM:
+        log("gateway=broker", tool=tool, upstream=TOOL_UPSTREAM[tool], sub=who["sub"])
+        from mcp import Client
+        from mcp.client.streamable_http import create_mcp_http_client, streamable_http_client
+        try:
+            async with create_mcp_http_client(headers=dsub) as http:
+                async with Client(streamable_http_client(TOOL_UPSTREAM[tool], http_client=http)) as rc:
+                    result = await rc.call_tool(tool, args)
+            text = "\n".join(getattr(c, "text", "") for c in getattr(result, "content", []) or []) \
+                or json.dumps(getattr(result, "structured_content", None))
+            payload = {"resultType": "complete", "content": [{"type": "text", "text": text}], "isError": False}
+        except Exception as e:  # noqa: BLE001  surface as a tool error, not a dead session
+            log("gateway=broker_error", tool=tool, error=f"{type(e).__name__}: {e}")
+            payload = {"resultType": "complete",
+                       "content": [{"type": "text", "text": f"runner error: {type(e).__name__}: {e}"}], "isError": True}
+        return JSONResponse({"jsonrpc": "2.0", "id": rpc.get("id"), "result": payload})
+
     # l5d-*: the mesh's view of *this* hop. Never forward it; the next proxy sets its own.
     headers = {k: v for k, v in request.headers.items() if k.lower() not in HOP and not k.lower().startswith("l5d-")}
-    headers["x-highway-sub"] = who["sub"]          # downstream sees on whose behalf
-    headers["x-highway-act"] = who["act"]
+    headers.update(dsub)                           # downstream sees on whose behalf
     async with httpx.AsyncClient(timeout=30) as c:
         up = await c.request(request.method, UPSTREAM, content=body, headers=headers)
     out = {k: v for k, v in up.headers.items() if k.lower() not in HOP | {"content-encoding"}}
@@ -112,7 +136,7 @@ app = Starlette(routes=[Route("/mcp", mcp, methods=["GET", "POST", "DELETE"]), R
 
 def main() -> None:
     port = int(os.environ.get("PORT", "8080"))
-    log("mcp-gateway starting", port=port, upstream=UPSTREAM, opa=OPA_URL)
+    log("mcp-gateway starting", port=port, upstream=UPSTREAM, runner=RUNNER or "-", opa=OPA_URL)
     uvicorn.run(app, host="0.0.0.0", port=port, log_level="warning")
 
 

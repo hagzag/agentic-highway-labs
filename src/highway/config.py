@@ -35,6 +35,10 @@ STS_URL = env("STS_URL", "http://sts:8080")
 STS_ISSUER = env("STS_ISSUER", "http://sts.migration.svc.cluster.local:8080")
 KEYCLOAK_ISSUER = env("KEYCLOAK_ISSUER", "http://keycloak.idp.svc.cluster.local:8080/realms/highway")
 # What the planner asks for. Greedy on purpose: the STS trims it to what the human holds.
-PERMIT_SCOPES = env("PERMIT_SCOPES", "buckets:read buckets:copy buckets:delete")
+PERMIT_SCOPES = env("PERMIT_SCOPES", "buckets:read buckets:copy buckets:delete scripts:run")
 # key = Part 1-2 static LLM_API_KEY; svid = no key, a JWT-SVID to the LLM gateway.
 LLM_AUTH = env("LLM_AUTH", "key")
+
+# Part 4: the sandbox-runner exposes run_script behind the same gateway.
+RUNNER_URL = env("RUNNER_URL", "http://sandbox-runner:8000/mcp")
+SINK_URL = env("SINK_URL", "http://sink.internet.svc.cluster.local:9000")

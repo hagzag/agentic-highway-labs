@@ -42,14 +42,14 @@ AUDIENCES = {"mcp-gateway"}
 TD = "spiffe://highway.lab/ns/migration/sa"
 # What a human's realm roles are worth in scopes.
 ROLE_SCOPES = {
-    "migrator": {"buckets:read", "buckets:copy"},
+    "migrator": {"buckets:read", "buckets:copy", "scripts:run"},
     "storage-admin": {"buckets:read", "buckets:copy", "buckets:delete"},
 }
 # may_act, decided by the authorization server instead of by the token:
 # which agent may act for whom, and the most it may ever carry.
 ACTORS = {
-    f"{TD}/planner-agent": {"for": "human", "max": {"buckets:read", "buckets:copy", "buckets:delete"}},
-    f"{TD}/executor-agent": {"for": f"{TD}/planner-agent", "max": {"buckets:read", "buckets:copy", "buckets:delete"}},
+    f"{TD}/planner-agent": {"for": "human", "max": {"buckets:read", "buckets:copy", "buckets:delete", "scripts:run"}},
+    f"{TD}/executor-agent": {"for": f"{TD}/planner-agent", "max": {"buckets:read", "buckets:copy", "buckets:delete", "scripts:run"}},
 }
 ACTORS = json.loads(os.environ["STS_ACTORS"]) if os.environ.get("STS_ACTORS") else ACTORS
 

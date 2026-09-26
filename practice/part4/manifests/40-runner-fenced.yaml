@@ -1,0 +1,28 @@
+# The runtime half of the fence: no ServiceAccount token to steal, and the process
+# runs under gVisor (runsc) instead of sharing the host kernel.
+# runtimeClassName is templated: run.sh sets it to "gvisor" only when runsc is
+# actually installed on the node, and to "" (runc) otherwise, so the lab still runs.
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: sandbox-runner, namespace: migration}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: sandbox-runner}}
+  template:
+    metadata: {labels: {app: sandbox-runner}}
+    spec:
+      serviceAccountName: sandbox-runner
+      automountServiceAccountToken: false     # the app loses its token; Linkerd keeps its own
+      runtimeClassName: RUNTIME_CLASS
+      containers:
+        - name: sandbox-runner
+          image: highway-agent:dev
+          imagePullPolicy: IfNotPresent
+          command: ["python", "-m", "highway.runner"]
+          ports: [{containerPort: 8000, name: http}]
+          readinessProbe:
+            httpGet: {path: /healthz, port: http}
+            periodSeconds: 3
+          env:
+            - {name: AGENT_NAME, value: sandbox-runner}
+            - {name: SINK_URL, value: "http://sink.internet.svc.cluster.local:9000"}
