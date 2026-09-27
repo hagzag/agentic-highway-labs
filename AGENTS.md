@@ -7,7 +7,9 @@ Companion labs for a blog series. Every part must **break before it fixes**. Don
 - the planner prompt that follows inventory notes,
 - the static `LLM_API_KEY` in Parts 1-2 (Part 3 moves it into `llm-gateway`),
 - the missing Redis authz (Part 3's permits ride in the queue; the sender constraint is the defence),
-- `mcp-tools:8000` reachable without the gateway (Part 3's ending; Part 4 fences it).
+- `mcp-tools:8000` reachable without the gateway (Part 3's ending; Part 4 fences it),
+- the `x-highway-sub` header trusted by mcp-tools/sandbox-runner logs (Part 5's framed bypass; the audit replay shows why a header is a claim, not proof),
+- Part 5 runs with Part 4's fence *off*: the black box records the crash.
 
 They're the teaching material for later parts.
 
@@ -15,8 +17,8 @@ They're the teaching material for later parts.
 - `practice/partN/{README.md, manifests/, run.sh, cleanup.sh, captured/}`. `run.sh <step>` subcommands map 1:1 to `task partN:<step>`.
 - Pin versions in `scripts/lib.sh` only. Never use `latest` for control-plane components.
 - One image (`src/Dockerfile`). Roles are chosen by `command:` in the manifests.
-- Log lines are logfmt-ish (`highway/log.py`) because the posts `grep` them. Keep field names stable: `tool=`, `peer=`, `signer=`, `executor=REJECTED reason=`, and from Part 3 `sts=issued|DENY`, `gateway=ALLOW|DENY`, `llm=ALLOW|DENY`, `sub=`, `act=`, `caller=`, `dropped=`, and from Part 4 `runner=run_script|done`, `sink=received`, `probe target= result=REACH|BLOCKED|NODNS`.
-- New behaviour goes behind a flag that defaults to the previous part's behaviour (`SIGN_PAYLOADS`, `PERMITS`, `LLM_AUTH`, `LOG_SUB`, and Part 4's `UPSTREAM_RUNNER_URL` on the gateway), so earlier labs keep producing their captured output.
+- Log lines are logfmt-ish (`highway/log.py`) because the posts `grep` them. Keep field names stable: `tool=`, `peer=`, `signer=`, `executor=REJECTED reason=`, and from Part 3 `sts=issued|DENY`, `gateway=ALLOW|DENY`, `llm=ALLOW|DENY`, `sub=`, `act=`, `caller=`, `dropped=`, and from Part 4 `runner=run_script|done`, `sink=received`, `probe target= result=REACH|BLOCKED|NODNS`, and from Part 5 `audit=appended|REJECTED|checkpoint|dropped`, `verify ... verdict=INTACT|TAMPERED`, `forge=audit-forged|audit-rewrite`, and the replay's `VERDICT` block.
+- New behaviour goes behind a flag that defaults to the previous part's behaviour (`SIGN_PAYLOADS`, `PERMITS`, `LLM_AUTH`, `LOG_SUB`, Part 4's `UPSTREAM_RUNNER_URL` on the gateway, and Part 5's `AUDIT_URL` / `AUDIT_REQUIRED`: unset = no audit events), so earlier labs keep producing their captured output.
 - `LLM_MODE=mock` must stay deterministic. Every lab has to pass offline.
 
 ## Checks before committing
@@ -56,6 +58,16 @@ SPIRE note: there is no `WorkloadAPIServer` block (SPIRE crashes on it). Early P
 - ✅ Bypass: direct call to mcp-tools deletes `prod-archive` with `sub=-` (sets up Part 4)
 
 See detailed findings in `../LAB-FINDINGS.md` and `../part1-verification.md`.
+
+**Part 5** verified on k3d 2026-09-27 (fresh cluster, `task down && task part5:capture`), see `practice/part5/captured/k3d/`:
+- ✅ Break: the sink's src IP maps to the runner pod, whose log has `sub=tester` and nothing else; the framed bypass logs `sub=hagzag` (0 permits ever issued to hagzag); after a restart the runner's log and pod IP are gone
+- ✅ Task 71 records 19 signed events across sts, planner, executor, gateway, mcp-tools, sandbox-runner; checkpoint anchored in the ConfigMap
+- ✅ `replay --ip` (sink src = runner pod IP) names tester, `executor-agent via planner-agent`, task 71, permit lineage, the poisoned note; `did: read_token bytes=1228 kube_api=200 exfil=200`
+- ✅ `replay --bucket prod-archive`: human UNPROVEN, no gateway decision, caller `rogue` from Linkerd's mTLS peer
+- ✅ Unsigned and self-signed (claims mcp-gateway) events rejected at ingest
+- ✅ Insider rewrite + rechain: `sig=BAD` at seq 13, checkpoint MISMATCH, verdict TAMPERED; replay ignores the bad record and still names tester
+- ✅ Collector at 0 replicas + `AUDIT_REQUIRED=true`: `audit=dropped` then gateway DENY `audit unavailable`
+- Fix found on the way: re-running `part3 up` on a reused cluster left `highway-permits` patched (MCP_URL=gateway); `up` now resets it.
 
 ## Commits
 Conventional Commits (`feat(part2): ...`, `fix(lib): ...`). Tag each part when its post ships: `part1`, `part2`, ...

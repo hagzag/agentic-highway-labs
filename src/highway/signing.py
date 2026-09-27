@@ -21,6 +21,8 @@ from spiffe import WorkloadApiClient
 from . import config
 
 TYP = "highway-task+jws"
+AUDIT_TYP = "highway-audit+jws"              # Part 5: one event in the black box
+CHECKPOINT_TYP = "highway-checkpoint+jws"    # Part 5: the collector's signed chain head
 MAX_AGE_S = 300
 
 # joserfc caps the protected header at 512 bytes by default. An x5c header
@@ -43,7 +45,7 @@ def _spiffe_id(cert: x509.Certificate) -> str:
     return next((u for u in uris if u.startswith("spiffe://")), "")
 
 
-def sign(task: dict) -> tuple[str, str]:
+def sign(task: dict, typ: str = TYP) -> tuple[str, str]:
     """Return (compact JWS, signer SPIFFE ID)."""
     with _client() as c:
         svid = c.fetch_x509_svid()
@@ -56,7 +58,7 @@ def sign(task: dict) -> tuple[str, str]:
         raise RuntimeError(f"unsupported SVID key type {type(key)}")
     header = {
         "alg": alg,
-        "typ": TYP,
+        "typ": typ,
         "x5c": [base64.b64encode(c.public_bytes(serialization.Encoding.DER)).decode() for c in svid.cert_chain],
     }
     now = int(time.time())
@@ -64,15 +66,20 @@ def sign(task: dict) -> tuple[str, str]:
     return jws.serialize_compact(header, json.dumps(body), jwk, algorithms=[alg], registry=REGISTRY), str(svid.spiffe_id)
 
 
-def verify(token: str) -> tuple[dict, str]:
-    """Return (task, signer SPIFFE ID) or raise Rejected."""
+def verify(token: str, typ: str = TYP, allowed: list[str] | None = None,
+           historic: bool = False) -> tuple[dict, str]:
+    """Return (task, signer SPIFFE ID) or raise Rejected.
+
+    allowed:  signer allow-list (default: ALLOWED_SIGNERS; [] = any SVID in the bundle).
+    historic: Part 5 audit replay. Judge the SVID at the time it signed (the payload's
+              iat), not now, and skip the freshness check: evidence doesn't expire."""
     if token.count(".") != 2:
         raise Rejected("unsigned payload")
     try:
         header = jws.extract_compact(token.encode(), registry=REGISTRY).headers()
     except Exception as e:  # noqa: BLE001
         raise Rejected(f"malformed JWS: {e}") from e
-    if header.get("typ") != TYP or not header.get("x5c"):
+    if header.get("typ") != typ or not header.get("x5c"):
         raise Rejected("missing typ/x5c header")
 
     chain = [x509.load_der_x509_certificate(base64.b64decode(c)) for c in header["x5c"]]
@@ -98,11 +105,19 @@ def verify(token: str) -> tuple[dict, str]:
         raise Rejected(f"bad chain: {e}") from e
 
     now = time.time()
-    if not (leaf.not_valid_before_utc.timestamp() <= now <= leaf.not_valid_after_utc.timestamp()):
+    when = now
+    if historic:  # unverified peek; the signature check below covers it
+        try:
+            p = token.split(".")[1]
+            when = float(json.loads(base64.urlsafe_b64decode(p + "=" * (-len(p) % 4))).get("iat", now))
+        except Exception:  # noqa: BLE001
+            when = now
+    if not (leaf.not_valid_before_utc.timestamp() <= when <= leaf.not_valid_after_utc.timestamp()):
         raise Rejected("signing SVID expired or not yet valid")
 
     # 2. Who is allowed to put work on this queue.
-    if config.ALLOWED_SIGNERS and signer not in config.ALLOWED_SIGNERS:
+    allowed = config.ALLOWED_SIGNERS if allowed is None else allowed
+    if allowed and signer not in allowed:
         raise Rejected(f"signer {signer} not in ALLOWED_SIGNERS")
 
     # 3. The signature itself, with the leaf's public key.
@@ -112,7 +127,7 @@ def verify(token: str) -> tuple[dict, str]:
         body = json.loads(jws.deserialize_compact(token, jwk, algorithms=[header["alg"]], registry=REGISTRY).payload)
     except Exception as e:  # noqa: BLE001
         raise Rejected(f"bad signature: {e}") from e
-    if body.get("exp", 0) < now:
+    if not historic and body.get("exp", 0) < now:
         raise Rejected("payload expired (replay?)")
     return body, signer
 

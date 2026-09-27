@@ -1,0 +1,79 @@
+# The black box. One collector (same image, role picked by `command:`) that:
+#   - accepts an event only if it is a JWS signed by a SPIRE-issued SVID, and only
+#     from the workload allowed to write that kind (gateway.* only from mcp-gateway)
+#   - appends it to a hash-chained JSONL file on a PVC (survives pod restarts)
+#   - after every append, signs {seq, head} with its own SVID and writes it to the
+#     audit-checkpoints ConfigMap: a stand-in for write-once storage (S3 Object Lock,
+#     a transparency log). Only this ServiceAccount may patch that ConfigMap.
+apiVersion: v1
+kind: ServiceAccount
+metadata: {name: audit, namespace: migration}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata: {name: audit-checkpoints, namespace: migration}
+data: {}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata: {name: audit-checkpoint-writer, namespace: migration}
+rules:
+  - apiGroups: [""]
+    resources: [configmaps]
+    resourceNames: [audit-checkpoints]
+    verbs: [get, patch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata: {name: audit-checkpoint-writer, namespace: migration}
+subjects: [{kind: ServiceAccount, name: audit, namespace: migration}]
+roleRef: {kind: Role, name: audit-checkpoint-writer, apiGroup: rbac.authorization.k8s.io}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata: {name: audit-log, namespace: migration}
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: local-path          # k3s default provisioner
+  resources: {requests: {storage: 64Mi}}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: audit, namespace: migration}
+spec:
+  replicas: 1
+  strategy: {type: Recreate}            # one writer per tape
+  selector: {matchLabels: {app: audit}}
+  template:
+    metadata: {labels: {app: audit}}
+    spec:
+      serviceAccountName: audit
+      containers:
+        - name: audit
+          image: highway-agent:dev
+          imagePullPolicy: IfNotPresent
+          command: ["python", "-m", "highway.audit", "serve"]
+          ports: [{containerPort: 8080, name: http}]
+          readinessProbe:
+            httpGet: {path: /healthz, port: http}
+            periodSeconds: 3
+          env:
+            - {name: AGENT_NAME, value: audit}
+            - {name: AUDIT_FILE, value: /var/lib/audit/audit.jsonl}
+            - {name: AUDIT_CHECKPOINT_CM, value: audit-checkpoints}
+            - {name: SPIFFE_ENDPOINT_SOCKET, value: "unix:///run/spire/sockets/agent.sock"}
+          volumeMounts:
+            - {name: spire, mountPath: /run/spire/sockets, readOnly: true}
+            - {name: tape, mountPath: /var/lib/audit}
+      volumes:
+        - name: spire
+          hostPath: {path: /run/spire/agent-sockets, type: Directory}
+        - name: tape
+          persistentVolumeClaim: {claimName: audit-log}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: audit, namespace: migration}
+spec:
+  selector: {app: audit}
+  ports: [{port: 8080, targetPort: http, name: http}]

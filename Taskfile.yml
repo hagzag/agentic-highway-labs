@@ -6,6 +6,7 @@ vars:
   P2: ./practice/part2/run.sh
   P3: ./practice/part3/run.sh
   P4: ./practice/part4/run.sh
+  P5: ./practice/part5/run.sh
 
 tasks:
   default:
@@ -63,6 +64,20 @@ tasks:
   part4:capture:     {desc: "run Part 4 and save output to practice/part4/captured/k3d", cmds: ["{{.P4}} capture"]}
   part4:doctor:      {desc: "Part 4 diagnostics: pods, netpol, runtime, runner/sink logs", cmds: ["{{.P4}} doctor"]}
   part4:cleanup:     {desc: "delete the internet ns, sandbox-runner, netpol, then Part 3", cmds: ["./practice/part4/cleanup.sh"]}
+
+  # --- Part 5: The Black Box (signed, hash-chained, anchored audit trail) ---
+  part5:up:      {desc: "Part 4 road (fence off) + audit collector (PVC tape, signed checkpoints)", cmds: ["{{.P5}} up"]}
+  part5:break:   {desc: "BREAK: the crash with pod logs only; nobody can say who, and the evidence dies", cmds: ["{{.P5}} break"]}
+  part5:record:  {desc: "FIX: every hop signs what it saw into the black box; same crash again", cmds: ["{{.P5}} record"]}
+  part5:replay:  {desc: "replay from the sink's src IP and from the deleted bucket: human, agent, task", cmds: ["{{.P5}} replay"]}
+  part5:forge:   {desc: "rogue plants a fake gateway ALLOW (unsigned, self-signed); rejected", cmds: ["{{.P5}} forge"]}
+  part5:tamper:  {desc: "insider rewrites a record and rechains; signature + checkpoint catch it", cmds: ["{{.P5}} tamper"]}
+  part5:verify:  {desc: "verify the tape against the latest anchored checkpoint", cmds: ["{{.P5}} verify"]}
+  part5:blind:   {desc: "collector down: the gateway refuses what it can't record", cmds: ["{{.P5}} blind"]}
+  part5:all:     {desc: "run Part 5 end to end", cmds: ["{{.P5}} all"]}
+  part5:capture: {desc: "run Part 5 and save output to practice/part5/captured/k3d", cmds: ["{{.P5}} capture"]}
+  part5:doctor:  {desc: "Part 5 diagnostics: recorder env, tape, checkpoint, rejections, drops", cmds: ["{{.P5}} doctor"]}
+  part5:cleanup: {desc: "delete the collector, tape and checkpoints, then Part 4", cmds: ["./practice/part5/cleanup.sh"]}
 
   # --- Utilities ------------------------------------------------------------
   image:  {desc: "build highway-agent:dev and import into k3d", cmds: ["bash -c 'source scripts/lib.sh && image_build'"]}

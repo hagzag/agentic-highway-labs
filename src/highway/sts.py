@@ -29,7 +29,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.routing import Route
 
-from . import config, svid
+from . import auditlog, config, svid
 from .log import log
 from .permits import GRANT, act_chain
 
@@ -159,12 +159,22 @@ async def token(request: Request) -> JSONResponse:
         permit = jwt.encode({"alg": "ES256", "kid": KEY.kid, "typ": "at+jwt"}, claims, KEY)
         log("sts=issued", sub=human, act=act_chain(claims), scope=claims["scope"],
             dropped=" ".join(sorted(dropped)) or "-", ttl=claims["exp"] - now, task_id=task_id or "-")
+        # Part 5: the permit's lineage. The first hop records the human's login
+        # (Keycloak session); later hops point at the permit they were exchanged from.
+        await auditlog.aemit(
+            "sts.issued", jti=claims["jti"], parent_jti=subj.get("jti") if upstream else None,
+            sub=human, act=act_chain(claims), actor=actor, scope=claims["scope"],
+            dropped=" ".join(sorted(dropped)) or None, exp=claims["exp"], task_id=task_id or None,
+            idp=None if upstream else {"iss": subj.get("iss"), "azp": subj.get("azp"), "sid": subj.get("sid"),
+                                       "auth_time": subj.get("auth_time") or subj.get("iat"),
+                                       "user_id": subj.get("sub")})
         return JSONResponse({
             "access_token": permit, "issued_token_type": "urn:ietf:params:oauth:token-type:access_token",
             "token_type": "Bearer", "expires_in": claims["exp"] - now, "scope": claims["scope"],
         })
     except Deny as d:
         log("sts=DENY", error=d.error, reason=d.description)
+        await auditlog.aemit("sts.deny", error=d.error, reason=d.description, task_id=str(form.get("task_id") or ""))
         return JSONResponse({"error": d.error, "error_description": d.description}, status_code=400)
 
 

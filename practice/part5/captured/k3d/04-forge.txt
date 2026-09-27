@@ -1,0 +1,6 @@
+
+[1;36m==> The rogue plants evidence: a gateway ALLOW for the delete, naming hagzag (unsigned, then self-signed)[0m
+12:17:48 forge=audit-forged mode=unsigned claimed=- result='403 {"rejected":"unsigned event"}'
+12:17:48 forge=audit-forged mode=self-signed claimed=mcp-gateway result='403 {"rejected":"chain does not lead to the highway.lab trust bundle (claimed spiffe://highway.lab/ns/migration/sa/mcp-gateway)"}'
+12:17:48 audit=REJECTED claimed=- kind=gateway.decision reason='unsigned event'
+12:17:48 audit=REJECTED claimed=mcp-gateway kind=gateway.decision reason='chain does not lead to the highway.lab trust bundle (claimed spiffe://highway.lab/ns/migration/sa/mcp-gateway)'

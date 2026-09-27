@@ -20,7 +20,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 from starlette.routing import Route
 
-from . import config, svid
+from . import auditlog, config, svid
 from .log import log
 from .permits import act_chain
 
@@ -85,6 +85,16 @@ async def mcp(request: Request) -> Response:
 
     who = {"sub": (permit or {}).get("sub", "-"), "act": act_chain(permit or {}),
            "caller": svid.short(caller), "task_id": (permit or {}).get("task_id", "-")}
+    # Part 5: record the decision before acting on it. With AUDIT_REQUIRED, a call
+    # the black box can't record is a call that doesn't happen.
+    if config.AUDIT_URL and (method == "tools/call" or not allow):
+        recorded = await auditlog.aemit(
+            "gateway.decision", decision="ALLOW" if allow else "DENY", method=method, tool=tool,
+            args=_args_digest(tool, args), sub=who["sub"], act=who["act"], caller=caller,
+            peer=request.headers.get("l5d-client-id"), jti=(permit or {}).get("jti"),
+            scope=(permit or {}).get("scope"), task_id=who["task_id"], reasons=None if allow else reasons)
+        if allow and not recorded and config.AUDIT_REQUIRED:
+            allow, reasons = False, ["audit unavailable (AUDIT_REQUIRED): no record, no action"]
     if not allow:
         log("gateway=DENY", method=method, tool=tool or "-", **who, reason="; ".join(reasons))
         if method == "tools/call":  # a tool error the model can read, not a crashed session
@@ -100,7 +110,9 @@ async def mcp(request: Request) -> Response:
     # with a real MCP client: the runner is stateless and needs the initialize handshake,
     # which this session did against mcp-tools, not the runner. Everything else is a
     # transparent proxy to mcp-tools.
-    dsub = {"x-highway-sub": who["sub"], "x-highway-act": who["act"]}
+    dsub = {"x-highway-sub": who["sub"], "x-highway-act": who["act"],
+            # Part 5: the upstream's audit event can name the task and the permit
+            "x-highway-task": str(who["task_id"]), "x-highway-jti": (permit or {}).get("jti", "-")}
     if tool in TOOL_UPSTREAM:
         log("gateway=broker", tool=tool, upstream=TOOL_UPSTREAM[tool], sub=who["sub"])
         from mcp import Client
@@ -125,6 +137,11 @@ async def mcp(request: Request) -> Response:
         up = await c.request(request.method, UPSTREAM, content=body, headers=headers)
     out = {k: v for k, v in up.headers.items() if k.lower() not in HOP | {"content-encoding"}}
     return Response(up.content, status_code=up.status_code, headers=out)
+
+
+def _args_digest(tool: str | None, args: dict) -> dict:
+    """Args as recorded: small values verbatim, code only as a fingerprint."""
+    return {k: (auditlog.digest(v) if k == "code" else v) for k, v in (args or {}).items()}
 
 
 async def healthz(_: Request) -> JSONResponse:

@@ -1,0 +1,119 @@
+
+[1;36m==> Part 4 road first (Keycloak, SPIRE, STS, gateways, sink, sandbox-runner)[0m
+
+[1;36m==> Part 3 road first (Keycloak, SPIRE, STS, gateways) with delegation ON[0m
+
+[1;36m==> Part 2 road first (cluster, Linkerd, SPIRE, signed tasks)[0m
+
+[1;36m==> Part 1 road first (cluster, agents, Linkerd)[0m
+
+[1;36m==> Creating k3d cluster 'highway'[0m
+[36mINFO[0m[0000] Prep: Network                                
+[36mINFO[0m[0000] Created network 'k3d-highway'                
+[36mINFO[0m[0000] Created image volume k3d-highway-images      
+[36mINFO[0m[0000] Starting new tools node...                   
+[36mINFO[0m[0000] Starting node 'k3d-highway-tools'            
+[36mINFO[0m[0001] Creating node 'k3d-highway-server-0'         
+[36mINFO[0m[0001] Creating node 'k3d-highway-agent-0'          
+[36mINFO[0m[0001] Creating LoadBalancer 'k3d-highway-serverlb' 
+[36mINFO[0m[0001] Using the k3d-tools node to gather environment information 
+[36mINFO[0m[0001] Starting new tools node...                   
+[36mINFO[0m[0001] Starting node 'k3d-highway-tools'            
+[36mINFO[0m[0002] Starting cluster 'highway'                   
+[36mINFO[0m[0002] Starting servers...                          
+[36mINFO[0m[0002] Starting node 'k3d-highway-server-0'         
+[36mINFO[0m[0008] Starting agents...                           
+[36mINFO[0m[0008] Starting node 'k3d-highway-agent-0'          
+[36mINFO[0m[0017] Starting helpers...                          
+[36mINFO[0m[0017] Starting node 'k3d-highway-serverlb'         
+[36mINFO[0m[0024] Injecting records for hostAliases (incl. host.k3d.internal) and for 4 network members into CoreDNS configmap... 
+[36mINFO[0m[0026] Cluster 'highway' created successfully!      
+[36mINFO[0m[0026] You can now use it like this:                
+kubectl cluster-info
+
+[1;36m==> Building highway-agent:dev and importing it into k3d[0m
+sha256:01d49c8c32a047ab2188015cd99d151dd0e993d4a25d4344398f382b1f7bce12
+
+[1;36m==> Deploying planner, executor, mcp-tools and redis (no mesh yet)[0m
+NAME                              READY   STATUS    RESTARTS   AGE   IP          NODE                   NOMINATED NODE   READINESS GATES
+executor-agent-675dc6bd8d-vq56m   0/1     Error     0          34s   10.42.1.4   k3d-highway-agent-0    <none>           <none>
+executor-agent-899476d4b-4r7t5    1/1     Running   0          33s   10.42.0.6   k3d-highway-server-0   <none>           <none>
+mcp-tools-7b69749594-bgdjm        1/1     Running   0          33s   10.42.1.6   k3d-highway-agent-0    <none>           <none>
+planner-agent-5f8465fdd6-ksmpw    1/1     Running   0          33s   10.42.0.7   k3d-highway-server-0   <none>           <none>
+redis-54bb87f944-nltft            1/1     Running   0          33s   10.42.1.5   k3d-highway-agent-0    <none>           <none>
+
+[1;36m==> Installing Gateway API v1.5.1 CRDs (Linkerd needs them)[0m
+
+[1;36m==> Installing Linkerd control plane[0m
+Rendering Linkerd CRDs...
+Next, run `linkerd install | kubectl apply -f -` to install the control plane.
+
+
+[1;36m==> Paving the road: inject the proxy into every pod in 'migration'[0m
+I0927 15:13:11.916627   79959 warnings.go:107] "Warning: v1 Endpoints is deprecated in v1.33+; use discovery.k8s.io/v1 EndpointSlice"
+linkerd check --proxy: ok
+NAME                              READY   STATUS    RESTARTS   AGE
+executor-agent-7765f64c4f-rv6rd   2/2     Running   0          41s
+mcp-tools-54c69c69cb-nbxvw        2/2     Running   0          47s
+planner-agent-fd96b8877-k5z85     2/2     Running   0          41s
+redis-5d474bf8b-rgm5q             2/2     Running   0          47s
+
+[1;36m==> Installing SPIRE 1.15.3 (server + agent DaemonSet)[0m
+
+[1;36m==> Registering identities: node alias + one entry per agent[0m
+SPIFFE ID               : spiffe://highway.lab/ns/migration/sa/executor-agent
+Selector                : k8s:ns:migration
+Selector                : k8s:sa:executor-agent
+SPIFFE ID               : spiffe://highway.lab/ns/migration/sa/mcp-tools
+Selector                : k8s:ns:migration
+Selector                : k8s:sa:mcp-tools
+SPIFFE ID               : spiffe://highway.lab/ns/migration/sa/planner-agent
+Selector                : k8s:ns:migration
+Selector                : k8s:sa:planner-agent
+
+[1;36m==> Redeploying agents with the Workload API socket (signing OFF)[0m
+planner-agent: SVID issued
+executor-agent: SVID issued
+
+[1;36m==> Keycloak 26.7.4: the humans' identity provider (realm highway)[0m
+
+[1;36m==> STS, MCP gateway (+ OPA 1.20.1) and LLM gateway[0m
+SPIFFE ID               : spiffe://highway.lab/ns/migration/sa/executor-agent
+SPIFFE ID               : spiffe://highway.lab/ns/migration/sa/llm-gateway
+SPIFFE ID               : spiffe://highway.lab/ns/migration/sa/mcp-gateway
+SPIFFE ID               : spiffe://highway.lab/ns/migration/sa/mcp-tools
+SPIFFE ID               : spiffe://highway.lab/ns/migration/sa/planner-agent
+SPIFFE ID               : spiffe://highway.lab/ns/migration/sa/sts
+
+[1;36m==> mcp-tools logs sub= from now on; agents restart with signing ON[0m
+sts: SVID issued
+mcp-gateway: SVID issued
+llm-gateway: SVID issued
+NAME                              READY   STATUS    RESTARTS   AGE
+executor-agent-5cd5458687-hxjlf   2/2     Running   0          38s
+llm-gateway-8648968dd9-mkldq      2/2     Running   0          39s
+mcp-gateway-5db89ddc9b-qz2qt      3/3     Running   0          39s
+mcp-tools-68b5d4dc85-p26tb        2/2     Running   0          38s
+planner-agent-c58fd8b97-bx4kv     2/2     Running   0          38s
+redis-5d474bf8b-rgm5q             2/2     Running   0          2m32s
+rogue-8585747984-glb7f            2/2     Running   0          75s
+sts-6846df9447-4s8gw              2/2     Running   0          39s
+NAME                        READY   STATUS    RESTARTS   AGE
+keycloak-7fc87bfd6b-gcmjv   2/2     Running   0          39s
+
+[1;36m==> The internet (sink) and the sandbox-runner (run_script), no fence yet[0m
+
+[1;36m==> Teach the gateway where run_script lives; restart agents with permits ON[0m
+NAME                              READY   STATUS    RESTARTS   AGE
+sandbox-runner-68b9b486f5-v8rxr   2/2     Running   0          35s
+NAME                    READY   STATUS    RESTARTS   AGE
+sink-567b86fb96-6574d   1/1     Running   0          36s
+
+[1;36m==> Rewind to the crash: fence OFF, recorder OFF (the black box is for the crash)[0m
+
+[1;36m==> The black box: audit collector (hash-chained tape on a PVC, signed checkpoints in a ConfigMap)[0m
+audit: SVID issued
+NAME                     READY   STATUS    RESTARTS   AGE
+audit-5675757676-qzsnq   2/2     Running   0          10s
+NAME        STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS   VOLUMEATTRIBUTESCLASS   AGE
+audit-log   Bound    pvc-a28cd271-b37c-4d93-bc7d-0b823c0752e4   64Mi       RWO            local-path     <unset>                 10s

@@ -13,12 +13,14 @@ subject to the same permit + policy checks (scope `scripts:run`).
 import io
 import os
 import contextlib
+import socket
 
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 from mcp.server.mcpserver import Context, MCPServer
 
+from . import auditlog
 from .log import log
 
 mcp = MCPServer("highway-runner", log_level="WARNING")
@@ -45,10 +47,26 @@ def run_script(code: str, ctx: Context, language: str = "python") -> str:
     except Exception as e:  # noqa: BLE001  report, don't crash the server
         out = buf.getvalue()
         log("runner=error", sub=sub, error=f"{type(e).__name__}: {e}")
+        _record(ctx, code, language, "error", f"{out}\nerror: {type(e).__name__}: {e}")
         return f"{out}\nerror: {type(e).__name__}: {e}"
     out = buf.getvalue().strip()
     log("runner=done", sub=sub, out_bytes=len(out))
+    _record(ctx, code, language, "ok", out)
     return out or "(no output)"
+
+
+def _pod_ip() -> str:
+    return os.environ.get("POD_IP") or socket.gethostbyname(socket.gethostname())
+
+
+def _record(ctx: Context, code: str, language: str, status: str, out: str) -> None:
+    """Part 5: what ran, for whom (claimed), from which pod IP, and what came out.
+    pod_ip is the join key for an off-cluster report ("the sink saw src=...")."""
+    h = ctx.headers or {}
+    auditlog.emit("runner.exec", language=language, status=status, code=auditlog.digest(code),
+                  code_bytes=len(code), out=out[:240], out_digest=auditlog.digest(out),
+                  sub=h.get("x-highway-sub"), act=h.get("x-highway-act"), task_id=h.get("x-highway-task"),
+                  jti=h.get("x-highway-jti"), peer=h.get("l5d-client-id"), pod_ip=_pod_ip())
 
 
 @mcp.custom_route("/healthz", methods=["GET"])

@@ -1,0 +1,18 @@
+
+[1;36m==> BREAK: the crash again, recorder OFF (task 70): poisoned note -> run_script exfil; rogue deletes prod-archive[0m
+12:16:46 forge=bypass target=http://mcp-tools:8000/mcp framed=hagzag result='{"result": "deleted prod-archive"}'
+
+[1;36m==> Q1: the sink holds a stolen token. Whose pod sent it?[0m
+12:16:36 sink=received bytes=1230 src=10.42.0.20 preview=eyJhbGciOiJSUzI1NiIsImtpZCI6IkYxaWVHWW0tUjBhRDhrblNjQmlqZ0ZTQmtzZS12cFk5Qlg3QUk5
+pod with src=10.42.0.20: migration/sandbox-runner-68b9b486f5-v8rxr
+12:16:36 runner=run_script language=python bytes=772 sub=tester
+12:16:36 runner=done sub=tester out_bytes=44
+A name (sub=tester) and a byte count. No task, no permit, no agent; nothing that joins it to the planner's log.
+
+[1;36m==> Q2: prod-archive is gone. Who? mcp-tools' log names a human[0m
+12:16:46 tool=delete_bucket bucket=prod-archive status=ok peer=rogue.migration.serviceaccount.identity.linkerd.cluster.local sub=hagzag
+permits the STS ever issued to hagzag: 0
+hagzag never logged in. sub= is a header the rogue typed (Part 1's requested_by, again).
+
+[1;36m==> And the evidence dies with the pod: restart the runner[0m
+runner=run_script lines: before restart 1, after 0. pod with src=10.42.0.20: <no pod has this IP any more>

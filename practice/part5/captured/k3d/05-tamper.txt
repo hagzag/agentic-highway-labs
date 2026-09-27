@@ -1,0 +1,21 @@
+
+[1;36m==> Before: verify the tape against the anchored checkpoint[0m
+12:17:51 verify records=20 chain=OK signatures=20/20 checkpoint='OK (seq=20 head=5021ed82b33a)' verdict=INTACT
+
+[1;36m==> The insider (write access to the audit volume): the gateway's run_script ALLOW now says ops-admin; hash chain recomputed[0m
+12:17:51 forge=audit-rewrite seq=13 field=sub before=tester after=ops-admin rechained=8
+
+[1;36m==> After: the chain links up (rechained), but the gateway's signature and the anchored head don't[0m
+12:17:54 verify seq=13 chain=OK sig=BAD kind=gateway.decision claimed=mcp-gateway reason='bad signature: payload changed after it was signed'
+12:17:54 verify records=20 chain=OK signatures=19/20 checkpoint='MISMATCH (seq=20 anchored head=5021ed82b33a file has 1d6adfebe42a)' verdict=TAMPERED
+command terminated with exit code 1
+
+[1;36m==> Replay still names the right human, and says which record lies[0m
+VERDICT for #14 (run_script on 10.42.1.24)
+  human   : tester (Keycloak session oYAs2jnN; every signed permit in the chain says sub=tester)
+  agent   : executor-agent via planner-agent (from the permit chain and executor-agent's own signed record; the gateway's record did not verify)
+  task    : 71, permit ca21ac08 <- 05207839, scope 'buckets:copy buckets:read scripts:run'
+  why     : step 'run diagnostics script' of the plan, written by planner-agent from inventory 1694b2eb1a2e16ce
+  did     : read_token bytes=1228 kube_api=200 exfil=200
+  evidence: 9 linked records, 1 FAILED verification and was ignored
+  tampered: #13 gateway.decision now says sub=ops-admin; mcp-gateway's signature no longer matches it

@@ -42,3 +42,9 @@ LLM_AUTH = env("LLM_AUTH", "key")
 # Part 4: the sandbox-runner exposes run_script behind the same gateway.
 RUNNER_URL = env("RUNNER_URL", "http://sandbox-runner:8000/mcp")
 SINK_URL = env("SINK_URL", "http://sink.internet.svc.cluster.local:9000")
+
+# Part 5: the black box. Every hop signs what it saw (X.509-SVID) and ships it to
+# the audit collector. Empty AUDIT_URL = no events (Parts 1-4 behaviour).
+AUDIT_URL = env("AUDIT_URL")
+# The gateway refuses a tool call it cannot record: no record, no action.
+AUDIT_REQUIRED = flag("AUDIT_REQUIRED")

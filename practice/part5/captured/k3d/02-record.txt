@@ -1,0 +1,35 @@
+
+[1;36m==> FIX: recorder ON. Every hop signs what it saw (X.509-SVID) and ships it to the black box[0m
+sts: SVID issued
+planner-agent: SVID issued
+executor-agent: SVID issued
+mcp-gateway: SVID issued
+mcp-tools: SVID issued
+sandbox-runner: SVID issued
+mcp-gateway: AUDIT_REQUIRED=true (no record, no action)
+
+[1;36m==> The same crash, recorder ON (task 71), and the same framed bypass[0m
+12:17:44 forge=bypass target=http://mcp-tools:8000/mcp framed=hagzag result='{"result": "deleted prod-archive"}'
+
+[1;36m==> What the black box accepted (signature chains to SPIRE; signer may write that kind)[0m
+12:17:33 audit=appended seq=1 kind=sts.issued signer=sts task_id=71
+12:17:33 audit=appended seq=2 kind=gateway.decision signer=mcp-gateway task_id=71
+12:17:33 audit=appended seq=3 kind=tool.exec signer=mcp-tools task_id=71
+12:17:33 audit=appended seq=4 kind=planner.plan signer=planner-agent task_id=71
+12:17:33 audit=appended seq=5 kind=sts.issued signer=sts task_id=71
+12:17:33 audit=appended seq=6 kind=executor.task signer=executor-agent task_id=71
+12:17:33 audit=appended seq=7 kind=executor.tool_call signer=executor-agent task_id=71
+12:17:33 audit=appended seq=8 kind=gateway.decision signer=mcp-gateway task_id=71
+12:17:33 audit=appended seq=9 kind=tool.exec signer=mcp-tools task_id=71
+12:17:33 audit=appended seq=10 kind=sts.issued signer=sts task_id=71
+12:17:33 audit=appended seq=11 kind=executor.task signer=executor-agent task_id=71
+12:17:33 audit=appended seq=12 kind=executor.tool_call signer=executor-agent task_id=71
+12:17:33 audit=appended seq=13 kind=gateway.decision signer=mcp-gateway task_id=71
+12:17:34 audit=appended seq=14 kind=runner.exec signer=sandbox-runner task_id=71
+12:17:34 audit=appended seq=15 kind=sts.issued signer=sts task_id=71
+12:17:34 audit=appended seq=16 kind=executor.task signer=executor-agent task_id=71
+12:17:34 audit=appended seq=17 kind=executor.tool_call signer=executor-agent task_id=71
+12:17:34 audit=appended seq=18 kind=gateway.decision signer=mcp-gateway task_id=71
+12:17:34 audit=appended seq=19 kind=tool.exec signer=mcp-tools task_id=71
+12:17:44 audit=appended seq=20 kind=tool.exec signer=mcp-tools task_id=-
+12:17:44 audit=checkpoint seq=20 head=5021ed82b33a to=configmap/audit-checkpoints

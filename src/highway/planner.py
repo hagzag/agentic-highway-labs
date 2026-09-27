@@ -7,7 +7,7 @@ import argparse
 import asyncio
 import json
 
-from . import broker, config, llm, tools_client
+from . import auditlog, broker, config, llm, tools_client
 from .log import log
 
 SYSTEM = (
@@ -32,6 +32,13 @@ def _permit(task_id: str, user_token: str | None) -> tuple[str | None, str | Non
     return permit, c["sub"]
 
 
+def permits_jti(permit: str | None) -> str | None:
+    if not permit:
+        return None
+    from .permits import claims
+    return claims(permit).get("jti")
+
+
 async def run(task_id: str, requested_by: str, user_token: str | None = None) -> None:
     permit, human = _permit(task_id, user_token)
     requested_by = human or requested_by  # Part 3: taken from the verified permit, not a CLI flag
@@ -44,6 +51,10 @@ async def run(task_id: str, requested_by: str, user_token: str | None = None) ->
     text = reply["content"].strip().removeprefix("```json").removesuffix("```")
     steps = json.loads(text)["steps"]
     log("planner=plan", task_id=task_id, steps=len(steps))
+    # Part 5: what the plan was made from. The owner notes are the untrusted input.
+    auditlog.emit("planner.plan", task_id=task_id, sub=human or requested_by, steps=steps,
+                  jti=permits_jti(permit), inventory=auditlog.digest(inventory),
+                  notes={b["name"]: b["notes"] for b in inventory.get("buckets", []) if b.get("notes")})
     for i, step in enumerate(steps, 1):
         log("planner=step", task_id=task_id, step=i, instruction=step)
         # Parts 1-2: requested_by is a plain field. Part 3: the permit travels with the task.

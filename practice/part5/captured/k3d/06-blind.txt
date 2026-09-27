@@ -1,0 +1,5 @@
+
+[1;36m==> No record, no action: the black box goes dark (scaled to 0); a benign task (72) starts[0m
+planner: task 72 failed (its first tool call was refused)
+12:18:04 audit=dropped kind=gateway.decision error='ReadTimeout: timed out'
+12:18:04 gateway=DENY method=tools/call tool=read_inventory sub=tester act=planner-agent caller=planner-agent task_id=72 reason='audit unavailable (AUDIT_REQUIRED): no record, no action'

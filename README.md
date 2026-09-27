@@ -12,7 +12,7 @@ Each part runs on a local k3d cluster. Each lab breaks something before it fixes
 | 2 | License Plates | [practice/part2](practice/part2) — SPIRE SVIDs → JWS-signed tasks across Redis | Forgery and tampering are rejected. A validly signed bad instruction still runs: identity ≠ permission. |
 | 3 | Driving Permits | [practice/part3](practice/part3) — Keycloak login → RFC 8693 token exchange (`sub` + `act`) → OPA at the MCP gateway; LLM key behind a gateway | The signed delete is denied, and a stolen permit is useless. A pod that skips the gateway still deletes `prod-archive`. |
 | 4 | The Closed Track | [practice/part4](practice/part4) — sandbox-runner (run_script) → NetworkPolicy + no token + gVisor; blast-radius report | A poisoned script steals the pod's token and ships it out; the fence stops both, and the bypass dies. |
-| 5 | The Black Box | _coming_ | |
+| 5 | The Black Box | [practice/part5](practice/part5) — every hop signs what it saw (SVID) → hash-chained tape → signed checkpoints; replay from an IP or a bucket | The exfil names `tester`, `executor-agent via planner-agent`, task 71. The framed delete names no human, only the rogue's mTLS identity. Forged and rewritten records are caught. |
 
 ## The cast
 
@@ -29,6 +29,7 @@ Each part runs on a local k3d cluster. Each lab breaks something before it fixes
 | `keycloak` (Part 3, ns `idp`) | The humans' IdP. Realm `highway`: `hagzag`, `tester`, `ops-admin`. |
 | `sandbox-runner` (Part 4) | Runs `run_script` behind the gateway. Fenced by NetworkPolicy, no token, and gVisor. |
 | `sink` (Part 4, ns `internet`) | Stands in for the internet. If a migration pod can reach it, egress is too open. |
+| `audit` (Part 5) | The black box. Accepts only SVID-signed events from the workload allowed to write them; hash-chains them on a PVC; anchors signed checkpoints in a ConfigMap. |
 
 The agent code is plain Python: an agent loop and the MCP SDK, with no framework. See [src/highway](src/highway).
 
@@ -43,7 +44,7 @@ The scripts install the Linkerd CLI themselves if it's missing. Pinned versions 
 - Linkerd `edge-26.9.3` (open-source Linkerd ships edge releases only)
 - Gateway API `v1.5.1`
 - SPIRE `1.15.3`
-- Keycloak `26.7.4`, OPA `1.20.1` (Part 3); gVisor `release/latest`, kube-router NetworkPolicy (Part 4)
+- Keycloak `26.7.4`, OPA `1.20.1` (Part 3); gVisor `release/latest`, kube-router NetworkPolicy (Part 4); nothing new in Part 5 (same image, k3s `local-path` PVC)
 
 ## LLM
 
@@ -66,6 +67,7 @@ task part1:all      # or step by step: task --list
 task part2:all
 task part3:all
 task part4:all
+task part5:all
 task down
 ```
 

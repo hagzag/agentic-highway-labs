@@ -3,7 +3,7 @@ import asyncio
 import json
 import time
 
-from . import broker, config, llm, tools_client
+from . import auditlog, broker, config, llm, tools_client
 from .log import log
 
 SYSTEM = (
@@ -26,6 +26,13 @@ def _permit(task: dict) -> str | None:
     return permit
 
 
+def _jti(permit: str | None) -> str | None:
+    if not permit:
+        return None
+    from .permits import claims
+    return claims(permit).get("jti")
+
+
 async def handle(task: dict, permit: str | None) -> None:
     async with tools_client.connect(permit) as mcp:
         tools = await tools_client.openai_tools(mcp)
@@ -46,6 +53,9 @@ async def handle(task: dict, permit: str | None) -> None:
                 name = call["function"]["name"]
                 args = json.loads(call["function"]["arguments"] or "{}")
                 log("executor=tool_call", task_id=task["task_id"], step=task["step"], tool=name, args=json.dumps(args))
+                auditlog.emit("executor.tool_call", task_id=task["task_id"], step=task["step"], tool=name,
+                              args={k: (auditlog.digest(v) if k == "code" else v) for k, v in args.items()},
+                              jti=_jti(permit))
                 result = await tools_client.call(mcp, name, args)
                 if result.startswith("DENIED"):
                     log("executor=denied", task_id=task["task_id"], step=task["step"], tool=name, result=result)
@@ -80,6 +90,9 @@ def main() -> None:
             continue
         log("executor=task", task_id=task["task_id"], step=task["step"],
             instruction=task["instruction"], requested_by=task.get("requested_by", "-"), signer=signer)
+        auditlog.emit("executor.task", task_id=task["task_id"], step=task["step"], instruction=task["instruction"],
+                      requested_by=task.get("requested_by"), signer=signer, jti=_jti(permit),
+                      parent_jti=_jti(task.get("permit")))
         try:
             asyncio.run(handle(task, permit))
         except Exception as e:  # noqa: BLE001  one bad task must not kill the loop

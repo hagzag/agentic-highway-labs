@@ -16,6 +16,7 @@ from starlette.responses import JSONResponse
 
 from mcp.server.mcpserver import Context, MCPServer
 
+from . import auditlog
 from .log import log
 
 SEED = {
@@ -48,6 +49,15 @@ def _who(ctx: Context) -> dict:
     return who
 
 
+def _record(ctx: Context, tool: str, status: str, **fields) -> None:
+    """Part 5: the tool's own signed account of what it did, and on whose (claimed) behalf.
+    sub/task/jti are headers the gateway sets; peer is the mesh's proven mTLS identity."""
+    h = ctx.headers or {}
+    auditlog.emit("tool.exec", tool=tool, status=status, sub=h.get("x-highway-sub"),
+                  task_id=h.get("x-highway-task"), jti=h.get("x-highway-jti"),
+                  peer=h.get("l5d-client-id"), **fields)
+
+
 def _find(name: str) -> dict | None:
     return next((b for b in STORE["buckets"] if b["name"] == name), None)
 
@@ -56,6 +66,7 @@ def _find(name: str) -> dict | None:
 def list_buckets(ctx: Context) -> list[str]:
     """List bucket names in the source environment."""
     log("tool=list_buckets", status="ok", **_who(ctx))
+    _record(ctx, "list_buckets", "ok")
     return [b["name"] for b in STORE["buckets"]]
 
 
@@ -63,6 +74,7 @@ def list_buckets(ctx: Context) -> list[str]:
 def read_inventory(ctx: Context) -> dict:
     """Return the migration inventory: buckets, flags and owner notes."""
     log("tool=read_inventory", status="ok", **_who(ctx))
+    _record(ctx, "read_inventory", "ok", inventory=auditlog.digest(STORE))
     return STORE
 
 
@@ -72,10 +84,12 @@ def copy_bucket(source: str, destination: str, ctx: Context) -> str:
     src = _find(source)
     if src is None:
         log("tool=copy_bucket", bucket=source, status="not_found", **_who(ctx))
+        _record(ctx, "copy_bucket", "not_found", bucket=source)
         return f"bucket {source} not found"
     if _find(destination) is None:
         STORE["buckets"].append({**src, "name": destination, "migrate": False, "notes": f"copy of {source}"})
     log("tool=copy_bucket", bucket=source, destination=destination, status="ok", **_who(ctx))
+    _record(ctx, "copy_bucket", "ok", bucket=source, destination=destination)
     return f"copied {source} -> {destination}"
 
 
@@ -85,9 +99,11 @@ def delete_bucket(bucket: str, ctx: Context) -> str:
     target = _find(bucket)
     if target is None:
         log("tool=delete_bucket", bucket=bucket, status="not_found", **_who(ctx))
+        _record(ctx, "delete_bucket", "not_found", bucket=bucket)
         return f"bucket {bucket} not found"
     STORE["buckets"].remove(target)
     log("tool=delete_bucket", bucket=bucket, status="ok", **_who(ctx))
+    _record(ctx, "delete_bucket", "ok", bucket=bucket)
     return f"deleted {bucket}"
 
 
