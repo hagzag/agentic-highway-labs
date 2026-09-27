@@ -56,6 +56,10 @@ up() {
   for f in 10-sts 20-mcp-gateway 30-llm-gateway; do
     render "$HERE/manifests/$f.yaml" | kubectl apply -f - >/dev/null
   done
+  # `permit` (and Part 4/5) merge-patch PERMITS/MCP_URL; `apply` doesn't undo a patch on a
+  # reused cluster. Reset so every run starts from the pre-gateway state.
+  kubectl -n "$NS" patch configmap highway-permits --type merge \
+    -p '{"data":{"PERMITS":"false","MCP_URL":"http://mcp-tools:8000/mcp"}}' >/dev/null
   for sa in sts mcp-gateway llm-gateway; do
     SS entry create -parentID "spiffe://$TD/k8s-node" -spiffeID "spiffe://$TD/ns/$NS/sa/$sa" \
       -selector "k8s:ns:$NS" -selector "k8s:sa:$sa" >/dev/null 2>&1 || true
