@@ -110,6 +110,8 @@ tasks:
   part7:capture: {desc: "run Part 7 and save output to practice/part7/captured/kind", cmds: ["{{.P7}} capture"]}
   part7:doctor:  {desc: "Part 7 diagnostics: Substrate pods, actor, egress policy, denials", cmds: ["{{.P7}} doctor"]}
   part7:down:    {desc: "delete the kind cluster", cmds: ["{{.P7}} down"]}
+  part7:vm-shell: {desc: "macOS: open a shell in Part 7's Lima VM (creates it if needed)", cmds: ["{{.P7}} vm-shell"]}
+  part7:vm-down:  {desc: "macOS: delete Part 7's Lima VM", cmds: ["{{.P7}} vm-down"]}
 
   # --- Part 8: OpenShell (Docker, runs on macOS; not yet captured) ----------
   part8:up:      {desc: "OpenShell CLI + store, lab STS, store-gate, OPA containers + the store provider", cmds: ["{{.P8}} up"]}

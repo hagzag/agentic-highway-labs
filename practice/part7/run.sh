@@ -2,13 +2,15 @@
 # Part 7 — Agent Substrate: the paved track, for real.
 #   ./run.sh            run every step
 #   ./run.sh <step>     up | paved | break | fix | capture | doctor | down
+#   macOS only:         vm-shell | vm-down  (every other step runs inside a Lima VM)
 # Runs Part 6's break against Agent Substrate (CNCF Sandbox): the runner becomes a
 # Substrate actor (gVisor), the store credential lives in Substrate's credential
 # provider, and Substrate's egress gateway injects it. Then the fix: Substrate injects
 # the actor's JWT instead, and store-gate (Part 6's gateway) checks the permit.
 #
 # NOT YET RUN END TO END (written 2026-11-21 from Substrate's docs). Needs Linux:
-# Substrate requires gVisor or a microVM, so it won't run on Docker Desktop for Mac.
+# Substrate requires gVisor or a microVM, so on macOS this script creates a Lima Linux VM
+# (lima.yaml) and re-runs itself there via vm-exec.sh.
 source "$(dirname "$0")/../../scripts/lib.sh"
 HERE="$(cd "$(dirname "$0")" && pwd)"
 OUT="$HERE/captured/kind"
@@ -16,6 +18,32 @@ SUBSTRATE_DIR="${SUBSTRATE_DIR:-$REPO_ROOT/.cache/substrate}"
 ATESPACE=highway
 ACTOR=runner-1
 ROUTER_PORT="${ROUTER_PORT:-18000}"
+VM="${PART7_VM:-highway-substrate}"
+
+# --- macOS: Substrate needs gVisor or a microVM, so run every step inside a Lima Linux VM
+vm_ensure() {
+  if ! command -v limactl >/dev/null; then
+    command -v brew >/dev/null || { echo "missing: limactl (install Homebrew, then: brew install lima)"; exit 1; }
+    say "Installing Lima"; brew install lima
+  fi
+  case "$(limactl list --format '{{.Status}}' "$VM" 2>/dev/null || true)" in
+    Running) ;;
+    Stopped) say "Starting Lima VM $VM"; limactl start "$VM" ;;
+    *) say "Creating Lima VM $VM (Ubuntu 24.04, 4 CPU, 8 GiB). First boot installs Docker, kind, kubectl, Go: ~5-10 min"
+       sed "s|@REPO_ROOT@|$REPO_ROOT|g" "$HERE/lima.yaml" > "$HERE/.lima.yaml"
+       limactl start --tty=false --name="$VM" "$HERE/.lima.yaml" ;;
+  esac
+}
+if [[ "$(uname -s)" == Darwin && -z "${PART7_IN_VM:-}" ]]; then
+  case "${1:-all}" in
+    vm-down)  limactl delete -f "$VM" ;;
+    vm-shell) vm_ensure; limactl shell --workdir "$REPO_ROOT" "$VM" ;;
+    *) vm_ensure; say "Running Part 7 '${1:-all}' inside Lima VM $VM"
+       limactl shell --workdir "$REPO_ROOT" "$VM" ./practice/part7/vm-exec.sh "${1:-all}" ;;
+  esac
+  exit
+fi
+
 ate() { kubectl ate "$@"; }
 k() { kubectl -n "$NS" "$@"; }
 py_in() { k exec "deploy/$1" -c "$1" -- python -c "$2"; }
@@ -46,12 +74,6 @@ actor_jwks() {  # Substrate's IdP (cmd/ate-idp-server) serves OIDC discovery + k
 }
 
 up() {
-  if [[ "$(uname -s)" == Darwin ]]; then
-    echo "Part 7 needs Linux: Substrate runs actors only under gVisor or a microVM, which Docker" >&2
-    echo "Desktop on macOS can't provide. Use a Linux VM (e.g. limactl start template://ubuntu)" >&2
-    echo "or a cloud VM (4 vCPU / 8 GB). On this Mac, run Part 8 instead: task part8:all" >&2
-    exit 1
-  fi
   need git go kind kubectl docker python3
 
   say "Agent Substrate $SUBSTRATE_REF on kind (Substrate's own dev path)"

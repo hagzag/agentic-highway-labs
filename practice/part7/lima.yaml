@@ -1,0 +1,33 @@
+# Lima VM for Part 7 on macOS: Ubuntu 24.04 with Docker, kind, kubectl and Go.
+# run.sh renders @REPO_ROOT@ into .lima.yaml and starts it as `highway-substrate`.
+# The repo is mounted at the same path inside the VM, so captures land in your checkout.
+images:
+- location: "https://cloud-images.ubuntu.com/releases/noble/release/ubuntu-24.04-server-cloudimg-arm64.img"
+  arch: "aarch64"
+- location: "https://cloud-images.ubuntu.com/releases/noble/release/ubuntu-24.04-server-cloudimg-amd64.img"
+  arch: "x86_64"
+cpus: 4
+memory: "8GiB"
+disk: "40GiB"
+mounts:
+- location: "@REPO_ROOT@"
+  writable: true
+containerd:
+  system: false
+  user: false
+provision:
+- mode: system
+  script: |
+    #!/bin/bash
+    set -eux -o pipefail
+    export DEBIAN_FRONTEND=noninteractive
+    ARCH=$(dpkg --print-architecture)
+    apt-get update
+    apt-get install -y docker.io git curl openssl python3-venv python3-pip build-essential
+    usermod -aG docker "{{.User}}"
+    command -v kind || { curl -fsSLo /usr/local/bin/kind "https://github.com/kubernetes-sigs/kind/releases/latest/download/kind-linux-$ARCH"; chmod +x /usr/local/bin/kind; }
+    command -v kubectl || { curl -fsSLo /usr/local/bin/kubectl "https://dl.k8s.io/release/$(curl -fsSL https://dl.k8s.io/release/stable.txt)/bin/linux/$ARCH/kubectl"; chmod +x /usr/local/bin/kubectl; }
+    [ -x /usr/local/go/bin/go ] || curl -fsSL "https://go.dev/dl/$(curl -fsSL 'https://go.dev/VERSION?m=text' | head -1).linux-$ARCH.tar.gz" | tar -C /usr/local -xz
+    # kind runs several nodes; the defaults run out of inotify watches
+    printf 'fs.inotify.max_user_watches=524288\nfs.inotify.max_user_instances=512\n' > /etc/sysctl.d/99-kind.conf
+    sysctl --system >/dev/null

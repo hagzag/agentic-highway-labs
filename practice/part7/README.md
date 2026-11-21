@@ -35,8 +35,9 @@ egress=DENY ... caller=actor/highway/runner-1 sub=tester ...
 
 ## Prerequisites
 
-- **Linux** (a VM is fine). Substrate needs gVisor (`runsc`) or a Cloud Hypervisor microVM, and plain containers aren't supported. Docker Desktop on Apple Silicon won't run it.
-- Docker, kind, kubectl, Go (Substrate installs with `go run ./cmd/ate-setup`), Python 3 with `src/requirements.txt` for `call.py`.
+- **Linux.** Substrate needs gVisor (`runsc`) or a Cloud Hypervisor microVM, and plain containers aren't supported, so Docker Desktop can't run it.
+- **On macOS the tasks handle this.** `task part7:all` installs [Lima](https://lima-vm.io) with Homebrew if it's missing, creates a VM called `highway-substrate` (Ubuntu 24.04, 4 CPU, 8 GiB, from `lima.yaml`), and runs every step inside it. Your checkout is mounted at the same path, so captures land in your repo. The first boot installs Docker, kind, kubectl and Go and takes about 5-10 minutes. `task part7:vm-shell` opens a shell in the VM and `task part7:vm-down` deletes it.
+- **On Linux:** Docker, kind, kubectl, Go (Substrate installs with `go run ./cmd/ate-setup`), and Python 3 with `src/requirements.txt` for `call.py`.
 - A recent Kubernetes. Substrate needs the PodCertificateRequest and ClusterTrustBundle APIs; its kind script sets that up.
 
 ## Open questions for the first run
@@ -45,7 +46,8 @@ egress=DENY ... caller=actor/highway/runner-1 sub=tester ...
 2. **Router to actor.** Does `atenet-router` pass `x-highway-permit` through to the actor, and does the MCP streamable-HTTP session survive actor suspend/resume?
 3. **IdP URL.** `run.sh` guesses the JWKS URL from the `ate-system` Service whose name contains `idp`. Set `ACTOR_JWKS_URL` if that's wrong. The JWT `sub` is documented as `actor/<atespace>/<actor-name>`.
 4. **Plain HTTP.** The EgressPolicies use `http` rules (no TLS MITM). Substrate decides cleartext on `Host`, method and headers, so `replaceHeaders` should apply, but that's unconfirmed.
-5. **`ext_proc`.** The cleaner fix puts the permit check *in* Substrate's egress path via `--experimental-additional-egress-extproc-service`. Its message contract isn't documented yet, so this part uses `store-gate` behind `actorJwt` instead.
+5. **gVisor in a Lima VM.** On Apple Silicon there's no nested KVM, so gVisor has to use its `systrap` platform inside kind's nodes. Whether Substrate's kind script sets that up is unconfirmed.
+6. **`ext_proc`.** The cleaner fix puts the permit check *in* Substrate's egress path via `--experimental-additional-egress-extproc-service`. Its message contract isn't documented yet, so this part uses `store-gate` behind `actorJwt` instead.
 
 ## How to use Agent Substrate
 
