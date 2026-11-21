@@ -39,7 +39,7 @@ if [[ "$(uname -s)" == Darwin && -z "${PART7_IN_VM:-}" ]]; then
     vm-down)  limactl delete -f "$VM" ;;
     vm-shell) vm_ensure; limactl shell --workdir "$REPO_ROOT" "$VM" ;;
     *) vm_ensure; say "Running Part 7 '${1:-all}' inside Lima VM $VM"
-       limactl shell --workdir "$REPO_ROOT" "$VM" ./practice/part7/vm-exec.sh "${1:-all}" ;;
+       limactl shell --workdir "$REPO_ROOT" "$VM" bash ./practice/part7/vm-exec.sh "${1:-all}" ;;
   esac
   exit
 fi

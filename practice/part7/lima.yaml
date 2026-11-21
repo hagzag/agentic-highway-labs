@@ -9,6 +9,12 @@ images:
 cpus: 4
 memory: "8GiB"
 disk: "40GiB"
+# Apple's NAT (vzNAT) for outbound traffic. Lima's default user-mode network (gvproxy) is
+# often blocked by VPN or endpoint-security software on the Mac: DNS resolves, TCP is refused.
+# vzNAT routes take precedence (metric 100 vs 200 for user-mode).
+vmType: vz
+networks:
+- vzNAT: true
 mounts:
 - location: "@REPO_ROOT@"
   writable: true
@@ -23,7 +29,7 @@ provision:
     export DEBIAN_FRONTEND=noninteractive
     ARCH=$(dpkg --print-architecture)
     apt-get update
-    apt-get install -y docker.io git curl openssl python3-venv python3-pip build-essential
+    apt-get install -y docker.io docker-buildx git curl openssl python3-venv python3-pip build-essential
     usermod -aG docker "{{.User}}"
     command -v kind || { curl -fsSLo /usr/local/bin/kind "https://github.com/kubernetes-sigs/kind/releases/latest/download/kind-linux-$ARCH"; chmod +x /usr/local/bin/kind; }
     command -v kubectl || { curl -fsSLo /usr/local/bin/kubectl "https://dl.k8s.io/release/$(curl -fsSL https://dl.k8s.io/release/stable.txt)/bin/linux/$ARCH/kubectl"; chmod +x /usr/local/bin/kubectl; }

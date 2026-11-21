@@ -24,6 +24,10 @@ if ! net; then
 fi
 for b in docker kind kubectl go; do command -v "$b" >/dev/null || { echo "missing in VM: $b (provisioning failed; see: sudo tail -50 /var/log/cloud-init-output.log, or task part7:vm-down and retry)" >&2; exit 1; }; done
 
+# Substrate's setup builds images with `docker build --platform`, which needs buildx
+docker buildx version >/dev/null 2>&1 || sudo docker buildx version >/dev/null 2>&1 || {
+  echo "==> Installing docker-buildx"; sudo apt-get install -y -qq docker-buildx >/dev/null; }
+
 # A fresh VM login may not have the docker group yet
-if id -nG | grep -qw docker; then exec ./practice/part7/run.sh "$@"; fi
-exec sg docker -c "./practice/part7/run.sh $*"
+if id -nG | grep -qw docker; then exec bash ./practice/part7/run.sh "$@"; fi
+exec sg docker -c "bash ./practice/part7/run.sh $*"
