@@ -60,7 +60,9 @@ router() {  # keep a port-forward to Substrate's router open for this script
 }
 call() {  # call <script> [permit]: run_script on the actor, through the router
   router
-  PYTHONPATH="$REPO_ROOT/src" python3 "$HERE/call.py" "http://localhost:$ROUTER_PORT" "$ATESPACE/$ACTOR" "$HERE/scripts/$1" "${2:-}"
+  # The highway image already has the MCP client; no pip install on the host
+  docker run --rm --network host -v "$HERE:/part7:ro" "$IMAGE" \
+    python /part7/call.py "http://localhost:$ROUTER_PORT" "$ATESPACE/$ACTOR" "/part7/scripts/$1" "${2:-}"
 }
 egress_policy() {  # egress_policy <file|none>: replace the actor's EgressPolicy
   ate delete egress-policy "$ACTOR" -a "$ATESPACE" >/dev/null 2>&1 || true
@@ -74,7 +76,7 @@ actor_jwks() {  # Substrate's IdP (cmd/ate-idp-server) serves OIDC discovery + k
 }
 
 up() {
-  need git go kind kubectl docker python3
+  need git go kind kubectl docker python3 openssl
 
   say "Agent Substrate $SUBSTRATE_REF on kind (Substrate's own dev path)"
   [[ -d "$SUBSTRATE_DIR/.git" ]] || git clone -q https://github.com/agent-substrate/substrate "$SUBSTRATE_DIR"
