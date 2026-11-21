@@ -113,6 +113,9 @@ async def mcp(request: Request) -> Response:
     dsub = {"x-highway-sub": who["sub"], "x-highway-act": who["act"],
             # Part 5: the upstream's audit event can name the task and the permit
             "x-highway-task": str(who["task_id"]), "x-highway-jti": (permit or {}).get("jti", "-")}
+    if config.FORWARD_PERMIT and tool in TOOL_UPSTREAM:
+        # Part 6: the runner's egress calls must say on whose behalf they run.
+        dsub["x-highway-permit"] = request.headers.get("authorization", "")[7:]
     if tool in TOOL_UPSTREAM:
         log("gateway=broker", tool=tool, upstream=TOOL_UPSTREAM[tool], sub=who["sub"])
         from mcp import Client

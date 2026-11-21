@@ -1,0 +1,6 @@
+{
+  "lab": {
+    "egress_callers": ["sandbox-runner.migration.serviceaccount.identity.linkerd.cluster.local"],
+    "retention_locked": ["prod-archive"]
+  }
+}

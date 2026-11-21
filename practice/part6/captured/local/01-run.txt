@@ -1,0 +1,35 @@
+
+==> PAVED: the runner holds no store credential, and the store refuses a call without one
+buckets: ['customer-data', 'billing-exports', 'prod-archive']
+direct DELETE, no credential: {"error":"unauthorized"}
+
+==> BREAK: EGRESS_PERMITS=false. The poisoned cleanup script asks the egress gateway
+env_store_token=False
+read_token=FileNotFoundError
+list=200 ["customer-data","billing-exports","prod-archive"]
+delete=200 {"deleted":"prod-archive"}
+exfil=403 {"error":"destination not in egress policy (default deny)"}
+buckets: ['customer-data', 'billing-exports']
+
+==> FIX: EGRESS_PERMITS=true. Same script, now carrying the permit its run_script call was made with (tester)
+env_store_token=False
+read_token=FileNotFoundError
+list=200 ["customer-data","billing-exports","prod-archive"]
+delete=403 {"error":"prod-archive is under retention lock; scope buckets:delete not in permit"}
+exfil=403 {"error":"destination not in egress policy (default deny)"}
+buckets: ['customer-data', 'billing-exports', 'prod-archive']
+
+==> Even ops-admin's permit (holds buckets:delete) can't spend the credential on a retention-locked bucket
+env_store_token=False
+read_token=FileNotFoundError
+list=200 ["customer-data","billing-exports","prod-archive"]
+delete=403 {"error":"prod-archive is under retention lock"}
+exfil=403 {"error":"destination not in egress policy (default deny)"}
+buckets: ['customer-data', 'billing-exports', 'prod-archive']
+
+==> No permit at all (a script that drops the header): DENY
+env_store_token=False
+read_token=FileNotFoundError
+list=403 {"error":"no permit (x-highway-permit)"}
+delete=403 {"error":"no permit (x-highway-permit); prod-archive is under retention lock"}
+exfil=403 {"error":"destination not in egress policy (default deny)"}

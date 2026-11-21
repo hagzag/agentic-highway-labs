@@ -43,7 +43,9 @@ EVERY = int(os.environ.get("AUDIT_CHECKPOINT_EVERY", "1"))
 PREFIX = os.environ.get("AUDIT_SPIFFE_PREFIX", "spiffe://highway.lab/ns/migration/sa/")
 # Which workload may write which kind of event. The prefix of `kind` picks the row.
 EMITTERS = {"sts": "sts", "planner": "planner-agent", "executor": "executor-agent",
-            "gateway": "mcp-gateway", "tool": "mcp-tools", "runner": "sandbox-runner"}
+            "gateway": "mcp-gateway", "tool": "mcp-tools", "runner": "sandbox-runner",
+            # Part 6: the egress gateway's decisions, and the store API's own account
+            "egress": "egress-gateway", "store": "mcp-tools"}
 COLLECTOR = os.environ.get("AUDIT_COLLECTOR_ID", PREFIX + "audit")
 
 
@@ -311,6 +313,14 @@ def describe(e: dict) -> str:
         return f"ran {e.get('language')} code={e.get('code')} sub={e.get('sub', '-')} (header) " \
                f"peer={_peer(e.get('peer'))} (mTLS) pod_ip={e.get('pod_ip')} permit={_j(e.get('jti'))}" \
                f"\n{'':27}output: {out}"
+    if k == "egress.decision":
+        why = f" reasons='{'; '.join(e.get('reasons', []))}'" if e.get("reasons") else ""
+        return f"{e.get('decision')} {e.get('method')} {e.get('host')}{e.get('path')} " \
+               f"credential={e.get('credential', '-')} caller={_peer(e.get('caller'))} (mTLS) " \
+               f"sub={e.get('sub', '-')} act='{e.get('act', '-')}' permit={_j(e.get('jti'))}{why}"
+    if k == "store.exec":
+        return f"store {e.get('op')} {e.get('bucket')} status={e.get('status')} sub={e.get('sub', '-')} " \
+               f"(header) peer={_peer(e.get('peer'))} (mTLS) permit={_j(e.get('jti'))}"
     return json.dumps(e)
 
 
@@ -335,6 +345,8 @@ def verdict(recs: list[Rec], a: Rec, shown: list[Rec]) -> None:
     what = f"{a.get('tool', 'run_script')} {a.get('bucket', '')}".strip()
     if a.get("kind") == "runner.exec":
         what = f"run_script on {a.get('pod_ip')}"
+    if a.get("kind") == "store.exec":
+        what = f"store {a.get('op')} {a.get('bucket')}"
     jti = a.get("jti")
     gates = [r for r in recs if r.get("kind") == "gateway.decision" and r.get("decision") == "ALLOW"
              and jti and r.get("jti") == jti and r.get("tool") == a.get("tool", "run_script")]
@@ -342,7 +354,13 @@ def verdict(recs: list[Rec], a: Rec, shown: list[Rec]) -> None:
     chain = [c for c in lineage(recs, jti) if c.ok] if jti else []
     root = chain[-1] if chain else None
     print(f"\nVERDICT for #{a.seq} ({what})")
-    if not jti:
+    egress = next((r for r in shown if r.get("kind") == "egress.decision" and r.get("decision") == "ALLOW"), None)
+    if not jti and egress:
+        print("  human   : NONE. The egress gateway spent the store credential without a permit")
+        print(f"  agent   : none proven. Caller {_peer(egress.get('caller'))} (mTLS) asked; "
+              f"credential={egress.get('credential')} was injected for it")
+        print("  task    : none. The sandbox never held the key, and it didn't need to")
+    elif not jti:
         print(f"  human   : UNPROVEN. sub={a.get('sub', '-')} is a request header anyone can set; "
               "no permit, no Keycloak login behind it")
         print("  agent   : none proven. No JWT-SVID, no gateway decision: this call never went through the gateway")
@@ -391,10 +409,15 @@ def story(recs: list[Rec], a: Rec) -> None:
             if r is a:
                 continue
             if (r in chain
-                    or (k in ("gateway.decision", "tool.exec", "runner.exec") and r.get("jti") in ids)
+                    or (k in ("gateway.decision", "tool.exec", "runner.exec", "egress.decision")
+                        and r.get("jti") in ids)
                     or (k.startswith("executor.") and r.get("jti") == jti)
                     or (k == "planner.plan" and r.get("jti") == root)):
                 keep.append(r)
+    if a.get("kind") == "store.exec":  # Part 6: the egress decision that spent the credential
+        keep += [r for r in recs if r.get("kind") == "egress.decision" and r not in keep
+                 and str(r.get("path", "")).endswith("/" + str(a.get("bucket")))
+                 and (r.get("jti") == jti if jti else not r.get("jti"))]
     keep.sort(key=lambda r: (r.get("iat", 0), r.seq))
     for r in keep:
         show(r)
@@ -410,7 +433,7 @@ def replay(path: str, task_id: str | None, ip: str | None, bucket: str | None) -
     if ip:
         anchors = [r for r in recs if r.get("kind") == "runner.exec" and r.get("pod_ip") == ip]
     else:
-        anchors = [r for r in recs if r.get("kind") == "tool.exec" and r.get("bucket") == bucket
+        anchors = [r for r in recs if r.get("kind") in ("tool.exec", "store.exec") and r.get("bucket") == bucket
                    and r.get("status") == "ok" and r.get("tool") != "read_inventory"]
     if not anchors:
         print(f"no record matches {'pod_ip=' + ip if ip else 'bucket=' + str(bucket)}")

@@ -20,10 +20,35 @@ from starlette.responses import JSONResponse
 
 from mcp.server.mcpserver import Context, MCPServer
 
-from . import auditlog
+import httpx
+
+from . import auditlog, config
 from .log import log
 
 mcp = MCPServer("highway-runner", log_level="WARNING")
+
+# Part 6: the permit of the run_script call in progress (scripts run one at a time).
+_CALL_PERMIT = ""
+
+
+def egress(method: str, url: str, body: bytes | None = None) -> str:
+    """Part 6: the script's only road out. Goes through the egress gateway, which
+    adds the credential the script never holds. "placeholder" is all it can send.
+
+        egress("DELETE", "http://mcp-tools:8000/store/v1/buckets/prod-archive")
+    """
+    if not config.EGRESS_URL:
+        return "no egress gateway (EGRESS_URL unset)"
+    target = url.split("://", 1)[-1]
+    headers = {"authorization": "placeholder"}
+    if _CALL_PERMIT:
+        headers["x-highway-permit"] = _CALL_PERMIT
+    try:
+        r = httpx.request(method, f"{config.EGRESS_URL.rstrip('/')}/{target}", content=body,
+                          headers=headers, timeout=10)
+        return f"{r.status_code} {r.text.strip()[:160]}"
+    except Exception as e:  # noqa: BLE001
+        return type(e).__name__
 
 
 def _peer(ctx: Context) -> str:
@@ -38,19 +63,21 @@ def run_script(code: str, ctx: Context, language: str = "python") -> str:
     log("runner=run_script", language=language, bytes=len(code), sub=sub)
     if language != "python":
         return f"unsupported language {language}"
+    global _CALL_PERMIT
+    _CALL_PERMIT = (ctx.headers or {}).get("x-highway-permit", "")
     buf = io.StringIO()
     try:
         with contextlib.redirect_stdout(buf):
             # The sandbox is the pod, not this exec(): the lab constrains the pod
             # from outside (NetworkPolicy, no token, gVisor), never the interpreter.
-            exec(code, {"__name__": "__runner__", "os": os})  # noqa: S102  lab-only, deliberate
+            exec(code, {"__name__": "__runner__", "os": os, "egress": egress})  # noqa: S102  lab-only, deliberate
     except Exception as e:  # noqa: BLE001  report, don't crash the server
         out = buf.getvalue()
         log("runner=error", sub=sub, error=f"{type(e).__name__}: {e}")
         _record(ctx, code, language, "error", f"{out}\nerror: {type(e).__name__}: {e}")
         return f"{out}\nerror: {type(e).__name__}: {e}"
     out = buf.getvalue().strip()
-    log("runner=done", sub=sub, out_bytes=len(out))
+    log("runner=done", sub=sub, out_bytes=len(out), out=out.replace("\n", " | ")[:300])
     _record(ctx, code, language, "ok", out)
     return out or "(no output)"
 

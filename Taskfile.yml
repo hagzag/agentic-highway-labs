@@ -7,6 +7,7 @@ vars:
   P3: ./practice/part3/run.sh
   P4: ./practice/part4/run.sh
   P5: ./practice/part5/run.sh
+  P6: ./practice/part6/run.sh
 
 tasks:
   default:
@@ -85,3 +86,15 @@ tasks:
   smoke:
     desc: "maintainers: run the agents as local processes (no cluster), mock LLM"
     cmds: ["scripts/local-smoke.sh start", "echo 'running; stop with: scripts/local-smoke.sh stop'"]
+
+  # --- Part 6: The Paved Track (credential-injecting egress gateway, permits + audit at egress) ---
+  part6:up:      {desc: "Parts 1-5 + store API + egress gateway (holds the credential) + paved NetworkPolicy", cmds: ["{{.P6}} up"]}
+  part6:paved:   {desc: "Part 4's exfil finds no token; the store credential isn't in the sandbox either", cmds: ["{{.P6}} paved"]}
+  part6:break:   {desc: "BREAK: the poisoned script asks the egress gateway; the credential is injected; prod-archive deleted", cmds: ["{{.P6}} break"]}
+  part6:permits: {desc: "FIX: the egress gateway checks the permit (OPA) and records it before injecting", cmds: ["{{.P6}} permits"]}
+  part6:replay:  {desc: "replay from the bucket: the credential spent on behalf of nobody, then the DENY", cmds: ["{{.P6}} replay"]}
+  part6:all:     {desc: "run Part 6 end to end", cmds: ["{{.P6}} all"]}
+  part6:local:   {desc: "run Part 6 as local processes (no cluster) and capture to practice/part6/captured/local", cmds: ["./practice/part6/local.sh"]}
+  part6:capture: {desc: "run Part 6 and save output to practice/part6/captured/k3d", cmds: ["{{.P6}} capture"]}
+  part6:doctor:  {desc: "Part 6 diagnostics: pods, netpol, egress gateway env and decisions", cmds: ["{{.P6}} doctor"]}
+  part6:cleanup: {desc: "delete the egress gateway, store credential and policy, then Part 5", cmds: ["./practice/part6/cleanup.sh"]}

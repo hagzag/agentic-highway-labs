@@ -1,0 +1,58 @@
+# The paved track's one road out. The egress gateway (same image, role picked by
+# `command:`) holds the store credential the sandbox never sees, adds it only to
+# requests for destinations in its policy, and drops everything else.
+# OPA sidecar = the Part 3 traffic law, applied to egress (on with EGRESS_PERMITS).
+# The store-token Secret is created by run.sh with a random value.
+apiVersion: v1
+kind: ServiceAccount
+metadata: {name: egress-gateway, namespace: migration}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: egress-gateway, namespace: migration}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: egress-gateway}}
+  template:
+    metadata: {labels: {app: egress-gateway}}
+    spec:
+      serviceAccountName: egress-gateway
+      automountServiceAccountToken: false
+      containers:
+        - name: egress-gateway
+          image: highway-agent:dev
+          imagePullPolicy: IfNotPresent
+          command: ["python", "-m", "highway.egress_gateway"]
+          ports: [{containerPort: 8080, name: http}]
+          readinessProbe:
+            httpGet: {path: /healthz, port: http}
+            periodSeconds: 3
+          env:
+            - {name: AGENT_NAME, value: egress-gateway}
+            - {name: EGRESS_PERMITS, value: "false"}          # run.sh flips this for the fix
+            - {name: EGRESS_CRED_DIR, value: /var/run/egress}
+            - {name: OPA_URL, value: "http://127.0.0.1:8181/v1/data/highway/egress/decision"}
+          envFrom:
+            - configMapRef: {name: highway-permits}             # STS_URL / STS_ISSUER
+          volumeMounts:
+            - {name: creds, mountPath: /var/run/egress, readOnly: true}
+            - {name: spire, mountPath: /run/spire/sockets, readOnly: true}   # signs audit events
+        - name: opa
+          image: openpolicyagent/opa:OPA_VERSION
+          args: ["run", "--server", "--addr=127.0.0.1:8181", "--disable-telemetry",
+                 "--log-level=error", "/policy/egress.rego", "/policy/data.json"]
+          volumeMounts: [{name: policy, mountPath: /policy, readOnly: true}]
+      volumes:
+        - name: creds
+          secret: {secretName: store-token, items: [{key: token, path: store-token}]}
+        - name: spire
+          hostPath: {path: /run/spire/agent-sockets, type: Directory}
+        - name: policy
+          configMap: {name: egress-policy}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: egress-gateway, namespace: migration}
+spec:
+  selector: {app: egress-gateway}
+  ports: [{port: 8080, targetPort: http, name: http}]
