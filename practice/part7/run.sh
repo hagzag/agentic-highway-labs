@@ -46,8 +46,13 @@ actor_jwks() {  # Substrate's IdP (cmd/ate-idp-server) serves OIDC discovery + k
 }
 
 up() {
+  if [[ "$(uname -s)" == Darwin ]]; then
+    echo "Part 7 needs Linux: Substrate runs actors only under gVisor or a microVM, which Docker" >&2
+    echo "Desktop on macOS can't provide. Use a Linux VM (e.g. limactl start template://ubuntu)" >&2
+    echo "or a cloud VM (4 vCPU / 8 GB). On this Mac, run Part 8 instead: task part8:all" >&2
+    exit 1
+  fi
   need git go kind kubectl docker python3
-  [[ "$(uname -s)" == Darwin ]] && echo "warning: Substrate needs gVisor or a microVM; use a Linux host or VM" >&2
 
   say "Agent Substrate $SUBSTRATE_REF on kind (Substrate's own dev path)"
   [[ -d "$SUBSTRATE_DIR/.git" ]] || git clone -q https://github.com/agent-substrate/substrate "$SUBSTRATE_DIR"
