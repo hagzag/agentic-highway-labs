@@ -1,0 +1,35 @@
+# The paved track's network: Part 4's fence, with one new road.
+# 1. mcp-tools (and its store API) accepts the MCP gateway and the egress gateway only.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: mcp-tools-ingress, namespace: migration}
+spec:
+  podSelector: {matchLabels: {app: mcp-tools}}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector: {matchLabels: {app: mcp-gateway}}
+        - podSelector: {matchLabels: {app: egress-gateway}}
+---
+# 2. The runner's only road out is the egress gateway (plus DNS and the mesh control plane).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: runner-egress, namespace: migration}
+spec:
+  podSelector: {matchLabels: {app: sandbox-runner}}
+  policyTypes: [Egress]
+  egress:
+    - ports: [{protocol: UDP, port: 53}, {protocol: TCP, port: 53}]
+    - to: [{namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: linkerd}}}]
+    - to: [{podSelector: {matchLabels: {app: egress-gateway}}}]
+    - to: [{podSelector: {matchLabels: {app: audit}}}]       # Part 5: the runner signs runner.exec
+---
+# 3. The sink stays unreachable from migration (same as Part 4).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: sink-ingress, namespace: internet}
+spec:
+  podSelector: {matchLabels: {app: sink}}
+  policyTypes: [Ingress]
+  ingress:
+    - from: [{namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: internet}}}]

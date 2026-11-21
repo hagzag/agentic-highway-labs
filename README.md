@@ -13,6 +13,7 @@ Each part runs on a local k3d cluster. Each lab breaks something before it fixes
 | 3 | Driving Permits | [practice/part3](practice/part3) — Keycloak login → RFC 8693 token exchange (`sub` + `act`) → OPA at the MCP gateway; LLM key behind a gateway | The signed delete is denied, and a stolen permit is useless. A pod that skips the gateway still deletes `prod-archive`. |
 | 4 | The Closed Track | [practice/part4](practice/part4) — sandbox-runner (run_script) → NetworkPolicy + no token + gVisor; blast-radius report | A poisoned script steals the pod's token and ships it out; the fence stops both, and the bypass dies. |
 | 5 | The Black Box | [practice/part5](practice/part5) — every hop signs what it saw (SVID) → hash-chained tape → signed checkpoints; replay from an IP or a bucket | The exfil names `tester`, `executor-agent via planner-agent`, task 71. The framed delete names no human, only the rogue's mTLS identity. Forged and rewritten records are caught. |
+| 6 | The Paved Track | [practice/part6](practice/part6) — the sandbox holds no credential; an egress gateway injects it (the default CNCF's Agent Substrate and OpenShell ship) → permit check (OPA) + signed audit at the gateway | Nothing left to steal, so the poisoned script asks the gateway, which spends the store credential and deletes `prod-archive`. With permits at egress the same call is DENIED and recorded. |
 
 ## The cast
 
@@ -30,6 +31,7 @@ Each part runs on a local k3d cluster. Each lab breaks something before it fixes
 | `sandbox-runner` (Part 4) | Runs `run_script` behind the gateway. Fenced by NetworkPolicy, no token, and gVisor. |
 | `sink` (Part 4, ns `internet`) | Stands in for the internet. If a migration pod can reach it, egress is too open. |
 | `audit` (Part 5) | The black box. Accepts only SVID-signed events from the workload allowed to write them; hash-chains them on a PVC; anchors signed checkpoints in a ConfigMap. |
+| `egress-gateway` (Part 6) | The runner's only road out. Holds the store credential and adds it to approved requests; with `EGRESS_PERMITS=true` it checks the permit (OPA sidecar) and signs each decision into the black box first. |
 
 The agent code is plain Python: an agent loop and the MCP SDK, with no framework. See [src/highway](src/highway).
 
@@ -68,6 +70,7 @@ task part2:all
 task part3:all
 task part4:all
 task part5:all
+task part6:all      # or, no cluster: task part6:local
 task down
 ```
 

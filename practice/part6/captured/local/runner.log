@@ -1,0 +1,8 @@
+17:38:38 runner=run_script language=python bytes=493 sub=tester
+17:38:38 runner=done sub=tester out_bytes=218 out='env_store_token=False | read_token=FileNotFoundError | list=200 ["customer-data","billing-exports","prod-archive"] | delete=200 {"deleted":"prod-archive"} | exfil=403 {"error":"destination not in egress policy (default deny)"}'
+17:38:41 runner=run_script language=python bytes=493 sub=tester
+17:38:41 runner=done sub=tester out_bytes=276 out='env_store_token=False | read_token=FileNotFoundError | list=200 ["customer-data","billing-exports","prod-archive"] | delete=403 {"error":"prod-archive is under retention lock; scope buckets:delete not in permit"} | exfil=403 {"error":"destination not in egress policy (default deny)"}'
+17:38:42 runner=run_script language=python bytes=493 sub=tester
+17:38:42 runner=done sub=tester out_bytes=240 out='env_store_token=False | read_token=FileNotFoundError | list=200 ["customer-data","billing-exports","prod-archive"] | delete=403 {"error":"prod-archive is under retention lock"} | exfil=403 {"error":"destination not in egress policy (default deny)"}'
+17:38:43 runner=run_script language=python bytes=493 sub=tester
+17:38:43 runner=done sub=tester out_bytes=260 out='env_store_token=False | read_token=FileNotFoundError | list=403 {"error":"no permit (x-highway-permit)"} | delete=403 {"error":"no permit (x-highway-permit); prod-archive is under retention lock"} | exfil=403 {"error":"destination not in egress policy (default deny)"}'

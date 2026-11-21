@@ -48,3 +48,13 @@ SINK_URL = env("SINK_URL", "http://sink.internet.svc.cluster.local:9000")
 AUDIT_URL = env("AUDIT_URL")
 # The gateway refuses a tool call it cannot record: no record, no action.
 AUDIT_REQUIRED = flag("AUDIT_REQUIRED")
+
+# Part 6: the paved track. The runner holds no credentials; its only road out is
+# the egress gateway, which adds the credential to approved requests.
+EGRESS_URL = env("EGRESS_URL")
+# The MCP gateway hands the runner the permit it was called with, so the runner's
+# egress requests can say on whose behalf they run.
+FORWARD_PERMIT = flag("FORWARD_PERMIT")
+# off = inject the credential for any allowed destination (what a sandbox does by
+# default); on = the egress gateway also checks the permit (OPA) and records it.
+EGRESS_PERMITS = flag("EGRESS_PERMITS")
