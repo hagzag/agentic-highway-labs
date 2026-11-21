@@ -1,0 +1,17 @@
+# OpenShell provider profile for the lab store. ASSUMED SHAPE: written from the docs'
+# description (credential definitions, endpoints, binaries). Before the first run, compare with
+#   openshell profile export openai -o yaml
+# and fix the field names, then: openshell profile lint -f profile-store.yaml
+id: highway-store
+display_name: Highway store API (lab)
+credentials:
+  - name: STORE_TOKEN
+    location: {header: Authorization, prefix: "Bearer "}
+endpoints:
+  - host: host.openshell.internal
+    port: 8000
+    protocol: rest
+    enforcement: enforce
+    access: full
+binaries:
+  - path: /usr/local/bin/python3*

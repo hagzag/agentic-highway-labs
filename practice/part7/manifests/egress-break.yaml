@@ -1,0 +1,11 @@
+# The break: what Substrate does by default once you grant a credential. Any request to
+# the store gets the store token, whatever the script is and whoever started it.
+rules:
+- http:
+    hostnames: ["mcp-tools.migration.svc.cluster.local"]
+    ports: {numbers: [8000]}
+    effects:
+      replaceHeaders:
+      - header: Authorization
+        prefix: "Bearer "
+        credentialUri: ate-secret://k8s.io/default/migration/store-token/token

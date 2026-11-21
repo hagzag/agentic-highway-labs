@@ -1,0 +1,13 @@
+# The fix: the actor may only reach store-gate, and Substrate injects the actor's own JWT,
+# not the store token. store-gate holds the token and checks the permit first.
+rules:
+- http:
+    hostnames: ["store-gate.migration.svc.cluster.local"]
+    ports: {numbers: [8080]}
+    effects:
+      replaceHeaders:
+      - header: Authorization
+        prefix: "Bearer "
+        actorJwt:
+          audiences: ["store-gate"]
+          expirationSeconds: 300

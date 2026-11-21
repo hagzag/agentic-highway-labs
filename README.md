@@ -14,6 +14,8 @@ Each part runs on a local k3d cluster. Each lab breaks something before it fixes
 | 4 | The Closed Track | [practice/part4](practice/part4) — sandbox-runner (run_script) → NetworkPolicy + no token + gVisor; blast-radius report | A poisoned script steals the pod's token and ships it out; the fence stops both, and the bypass dies. |
 | 5 | The Black Box | [practice/part5](practice/part5) — every hop signs what it saw (SVID) → hash-chained tape → signed checkpoints; replay from an IP or a bucket | The exfil names `tester`, `executor-agent via planner-agent`, task 71. The framed delete names no human, only the rogue's mTLS identity. Forged and rewritten records are caught. |
 | 6 | The Paved Track | [practice/part6](practice/part6) — the sandbox holds no credential; an egress gateway injects it (the default CNCF's Agent Substrate and OpenShell ship) → permit check (OPA) + signed audit at the gateway | Nothing left to steal, so the poisoned script asks the gateway, which spends the store credential and deletes `prod-archive`. With permits at egress the same call is DENIED and recorded. |
+| 7 | Agent Substrate | [practice/part7](practice/part7) — the runner as a gVisor actor on kind; credential via Substrate's provider (`credentialUri`), then `actorJwt` + store-gate _(not yet captured; Linux only)_ | Substrate injects the token and the delete goes through. With `actorJwt` the gate knows which actor and on whose behalf, and denies it. |
+| 8 | OpenShell | [practice/part8](practice/part8) — Docker sandbox with a store provider; L7 rules, the prover as a CI gate, and store-gate _(not yet captured)_ | Placeholder-only credentials, then the delete. L7 deny rules stop it statically; the permit gate stops it per delegation but can't tell which sandbox asked. |
 
 ## The cast
 
@@ -71,6 +73,8 @@ task part3:all
 task part4:all
 task part5:all
 task part6:all      # or, no cluster: task part6:local
+task part7:all      # Linux host: kind + Agent Substrate
+task part8:all      # Docker (macOS ok): OpenShell
 task down
 ```
 

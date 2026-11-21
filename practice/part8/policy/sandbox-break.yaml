@@ -1,0 +1,18 @@
+# The break: the sandbox may reach the store with full access; the provider adds the token.
+version: 1
+filesystem_policy:
+  include_workdir: true
+  read_only: [/usr, /lib, /etc, /app]
+  read_write: [/tmp]
+landlock: {compatibility: best_effort}
+network_policies:
+  highway_store:
+    name: highway_store
+    endpoints:
+      - host: host.openshell.internal
+        port: 8000
+        protocol: rest
+        enforcement: enforce
+        access: full
+    binaries:
+      - path: /usr/local/bin/python3*

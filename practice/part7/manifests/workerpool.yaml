@@ -1,0 +1,12 @@
+apiVersion: ate.dev/v1
+kind: WorkerPool
+metadata:
+  name: highway-runner
+  namespace: highway
+  labels: {workload: highway-runner}
+spec:
+  replicas: 2
+  workerImage: ko://go.ate.dev/substrate/cmd/ateworker-gvisor
+  sandboxClasses:
+  - name: gvisor
+    configRef: {name: gvisor-default}

@@ -1,0 +1,98 @@
+# The highway side of Part 7, on the Substrate kind cluster: the store (mcp-tools with
+# its credentialed REST API), a lab STS stand-in, and store-gate (Part 6's egress
+# gateway in front of the store, checking the permit and the actor JWT).
+# IMAGE, OPA_VERSION and ACTOR_JWKS_URL are substituted by run.sh.
+apiVersion: v1
+kind: Namespace
+metadata: {name: migration}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: mcp-tools, namespace: migration}
+spec:
+  selector: {matchLabels: {app: mcp-tools}}
+  template:
+    metadata: {labels: {app: mcp-tools}}
+    spec:
+      containers:
+        - name: mcp-tools
+          image: IMAGE
+          imagePullPolicy: IfNotPresent
+          command: ["python", "-m", "highway.mcp_tools"]
+          env:
+            - name: STORE_TOKEN
+              valueFrom: {secretKeyRef: {name: store-token, key: token}}
+          ports: [{containerPort: 8000}]
+---
+apiVersion: v1
+kind: Service
+metadata: {name: mcp-tools, namespace: migration}
+spec:
+  selector: {app: mcp-tools}
+  ports: [{port: 8000}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: sts, namespace: migration}
+spec:
+  selector: {matchLabels: {app: sts}}
+  template:
+    metadata: {labels: {app: sts}}
+    spec:
+      containers:
+        - name: sts
+          image: IMAGE
+          imagePullPolicy: IfNotPresent
+          command: ["python", "-m", "highway.lab_sts"]
+          env: [{name: HOST, value: "0.0.0.0"}, {name: PORT, value: "8080"}]
+          ports: [{containerPort: 8080}]
+---
+apiVersion: v1
+kind: Service
+metadata: {name: sts, namespace: migration}
+spec:
+  selector: {app: sts}
+  ports: [{port: 8080}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: store-gate, namespace: migration}
+spec:
+  selector: {matchLabels: {app: store-gate}}
+  template:
+    metadata: {labels: {app: store-gate}}
+    spec:
+      containers:
+        - name: store-gate
+          image: IMAGE
+          imagePullPolicy: IfNotPresent
+          command: ["python", "-m", "highway.egress_gateway"]
+          ports: [{containerPort: 8080}]
+          env:
+            - {name: EGRESS_PERMITS, value: "true"}
+            - {name: CALLER_FROM, value: actor-jwt}
+            - {name: ACTOR_JWKS_URL, value: "ACTOR_JWKS_URL"}
+            - {name: ACTOR_AUDIENCE, value: store-gate}
+            - {name: STS_URL, value: "http://sts:8080"}
+            - {name: STS_ISSUER, value: "http://sts.migration.svc.cluster.local:8080"}
+            - {name: EGRESS_CRED_DIR, value: /var/run/egress}
+            - name: EGRESS_POLICY
+              value: '{"mcp-tools.migration.svc.cluster.local:8000": {"prefix": "/store/", "credential": "store-token", "header": "Authorization", "value_prefix": "Bearer "}}'
+          volumeMounts: [{name: creds, mountPath: /var/run/egress, readOnly: true}]
+        - name: opa
+          image: openpolicyagent/opa:OPA_VERSION
+          args: ["run", "--server", "--addr=127.0.0.1:8181", "--disable-telemetry",
+                 "--log-level=error", "/policy/egress.rego", "/policy/data.json"]
+          volumeMounts: [{name: policy, mountPath: /policy, readOnly: true}]
+      volumes:
+        - name: creds
+          secret: {secretName: store-token, items: [{key: token, path: store-token}]}
+        - name: policy
+          configMap: {name: egress-policy}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: store-gate, namespace: migration}
+spec:
+  selector: {app: store-gate}
+  ports: [{port: 8080}]

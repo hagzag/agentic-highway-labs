@@ -78,5 +78,7 @@ See detailed findings in `../LAB-FINDINGS.md` and `../part1-verification.md`.
 - ✅ `opa test practice/part6/policy`: 6/6
 - Local runs have no mesh, so the local policy data adds caller `-`; on k3d the caller is Linkerd's `l5d-client-id`.
 
+**Parts 7 (Agent Substrate) and 8 (OpenShell)** are written from the projects' docs (2026-11-21) and **not yet run**. Their READMEs list the open questions (actor image pull, router headers, IdP URL; OpenShell profile field names). Pin `SUBSTRATE_REF` to a commit once Part 7 passes.
+
 ## Commits
 Conventional Commits (`feat(part2): ...`, `fix(lib): ...`). Tag each part when its post ships: `part1`, `part2`, ...

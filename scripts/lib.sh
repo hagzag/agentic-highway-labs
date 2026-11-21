@@ -10,6 +10,10 @@ export SPIRE_VERSION="${SPIRE_VERSION:-1.15.3}"
 export KEYCLOAK_VERSION="${KEYCLOAK_VERSION:-26.7.4}"         # verified 2026-09-25
 export OPA_VERSION="${OPA_VERSION:-1.20.1}"                   # verified 2026-09-25
 export GVISOR_CHANNEL="${GVISOR_CHANNEL:-release/latest}"     # Part 4: gVisor ships a rolling release, no semver pin
+# Part 7: Agent Substrate is pre-1.0 with no published release; pin a commit once a run passes.
+export SUBSTRATE_REF="${SUBSTRATE_REF:-main}"
+# Part 8: OpenShell CLI version (docs were at v0.1.9 on 2026-11-21).
+export OPENSHELL_VERSION="${OPENSHELL_VERSION:-0.1.9}"
 export NETSHOOT_IMAGE="${NETSHOOT_IMAGE:-nicolaka/netshoot:latest}"
 export IMAGE="highway-agent:dev"
 export NS=migration

@@ -1,0 +1,19 @@
+# Fix B, delegation: the sandbox may reach only store-gate, which holds the store token and
+# checks the permit (Part 3 policy) before adding it. No provider is attached.
+version: 1
+filesystem_policy:
+  include_workdir: true
+  read_only: [/usr, /lib, /etc, /app]
+  read_write: [/tmp]
+landlock: {compatibility: best_effort}
+network_policies:
+  store_gate:
+    name: store_gate
+    endpoints:
+      - host: host.openshell.internal
+        port: 8090
+        protocol: rest
+        enforcement: enforce
+        access: full
+    binaries:
+      - path: /usr/local/bin/python3*

@@ -25,7 +25,7 @@ import json, sys
 d = json.load(open(sys.argv[1])); d["lab"]["egress_callers"].append("-"); print(json.dumps(d))
 EOF
 
-bg "$PY" "$HERE/local_sts.py"
+bg "$PY" -m highway.lab_sts
 STORE_TOKEN="$(cat "$TMP/creds/store-token")" PORT=8000 bg "$PY" -m highway.mcp_tools > "$TMP/mcp-tools.log" 2>&1
 EGRESS_URL=http://127.0.0.1:8090 PORT=8001 bg "$PY" -m highway.runner > "$TMP/runner.log" 2>&1
 bg opa run --server --addr=127.0.0.1:8181 --skip-version-check --log-level=error "$HERE/policy/egress.rego" "$TMP/data.json" > "$TMP/opa.log" 2>&1

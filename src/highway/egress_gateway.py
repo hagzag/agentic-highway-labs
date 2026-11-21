@@ -48,8 +48,34 @@ OPA_URL = os.environ.get("OPA_URL", "http://127.0.0.1:8181/v1/data/highway/egres
 # Lab shortcut: the runner forwards the permit the MCP gateway accepted. Production
 # would exchange it again at the STS for audience "egress-gateway" (see README).
 PERMIT_AUDIENCE = os.environ.get("PERMIT_AUDIENCE", "mcp-gateway")
+# Part 7: who is asking. "mesh" = Linkerd's l5d-client-id (Part 6). "actor-jwt" = the
+# Authorization header carries an actor JWT that Agent Substrate's egress gateway
+# injected (actorJwt effect); verified against Substrate's IdP (ate-idp-server).
+CALLER_FROM = os.environ.get("CALLER_FROM", "mesh")
+ACTOR_JWKS_URL = os.environ.get("ACTOR_JWKS_URL", "")
+ACTOR_AUDIENCE = os.environ.get("ACTOR_AUDIENCE", "store-gate")
 
 _sts_keys: KeySet | None = None
+_actor_keys: KeySet | None = None
+
+
+def _actor(request: Request) -> str:
+    """Part 7: the actor identity Substrate vouched for, or "-"."""
+    global _actor_keys
+    auth = request.headers.get("authorization", "")
+    if not auth.lower().startswith("bearer ") or not ACTOR_JWKS_URL:
+        return "-"
+    try:
+        if _actor_keys is None:
+            _actor_keys = KeySet.import_key_set(httpx.get(ACTOR_JWKS_URL, timeout=5).json())
+        claims = jwt.decode(auth[7:], _actor_keys, algorithms=["ES256", "RS256"]).claims
+        jwt.JWTClaimsRegistry(aud={"essential": True, "value": ACTOR_AUDIENCE},
+                              exp={"essential": True}).validate(claims)
+        return str(claims.get("sub", "-"))   # actor/<atespace>/<actor-name>
+    except Exception as e:  # noqa: BLE001
+        _actor_keys = None
+        log("egress=actor_jwt_rejected", error=f"{type(e).__name__}: {e}")
+        return "-"
 
 
 def _credential(name: str) -> str:
@@ -83,7 +109,7 @@ async def forward(request: Request) -> Response:
     host, _, rest = request.path_params["target"].partition("/")
     path = "/" + rest
     method = request.method
-    caller = request.headers.get("l5d-client-id", "-")   # the mesh's proof of which pod is asking
+    caller = _actor(request) if CALLER_FROM == "actor-jwt" else request.headers.get("l5d-client-id", "-")
     where = {"method": method, "host": host, "path": path, "caller": caller}
 
     rule = POLICY.get(host)
@@ -143,7 +169,7 @@ app = Starlette(routes=[
 
 def main() -> None:
     port = int(os.environ.get("PORT", "8080"))
-    log("egress-gateway starting", port=port, permits=config.EGRESS_PERMITS,
+    log("egress-gateway starting", port=port, permits=config.EGRESS_PERMITS, caller_from=CALLER_FROM,
         routes=",".join(POLICY), opa=OPA_URL if config.EGRESS_PERMITS else "-")
     uvicorn.run(app, host="0.0.0.0", port=port, log_level="warning")
 

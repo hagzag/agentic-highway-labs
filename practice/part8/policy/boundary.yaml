@@ -1,0 +1,19 @@
+# The platform team's boundary for this kind of agent: read the store, nothing else.
+# openshell-prover check <candidate> --boundary boundary.yaml  (in CI, before a policy ships)
+version: 1
+filesystem_policy:
+  include_workdir: true
+  read_only: [/usr, /lib, /etc, /app]
+  read_write: [/tmp]
+landlock: {compatibility: best_effort}
+network_policies:
+  highway_store:
+    name: highway_store
+    endpoints:
+      - host: host.openshell.internal
+        port: 8000
+        protocol: rest
+        enforcement: enforce
+        access: read-only
+    binaries:
+      - path: /usr/local/bin/python3*

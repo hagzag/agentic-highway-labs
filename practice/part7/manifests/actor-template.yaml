@@ -1,0 +1,18 @@
+# The sandbox-runner as a Substrate actor template (kubectl ate create actor-template -f).
+# IMAGE is substituted by run.sh. env takes literal values only.
+metadata:
+  atespace: highway
+  name: sandbox-runner
+containers:
+- name: runner
+  image: IMAGE
+  command: ["python", "-m", "highway.runner"]
+  env:
+  - {name: PORT, value: "80"}
+  - {name: AGENT_NAME, value: sandbox-runner}
+  wakeupProbe:
+    httpGet: {path: /healthz, port: 80}
+workerSelector:
+  matchLabels: {workload: highway-runner}
+resources:
+  limits: {cpuMillicores: 500, memoryBytes: 536870912}
