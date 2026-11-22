@@ -54,10 +54,14 @@ permit() {  # permit <scopes> [sub] -> a permit from the lab STS stand-in
 }
 router() {  # keep `kubectl ate proxy` open: localhost:$ROUTER_PORT -> the actor's port 80, via Substrate's router
   # The router requires a client certificate, so a plain port-forward can't talk to it; the ate proxy mints one.
-  pkill -f "port-forward svc/atenet-router" 2>/dev/null || true   # left over from earlier versions of this script
-  pgrep -f "ate proxy actor $ACTOR" >/dev/null && (exec 3<>/dev/tcp/127.0.0.1/"$ROUTER_PORT") 2>/dev/null && return
+  # One fresh proxy per script run: a proxy left from an earlier run keeps a stale view of the
+  # router pods (and an expired client cert) and resets every connection.
+  [[ -n "${PROXY_STARTED:-}" ]] && return
+  pkill -f "port-forward svc/atenet-router" 2>/dev/null || true
+  pkill -f "ate proxy actor" 2>/dev/null || true
+  kubectl -n ate-system rollout status deploy/atenet-router --timeout=120s >/dev/null
   kubectl ate proxy actor "$ACTOR" "$ROUTER_PORT:80" -a "$ATESPACE" >"$HERE/.proxy.log" 2>&1 &
-  for _ in $(seq 30); do (exec 3<>/dev/tcp/127.0.0.1/"$ROUTER_PORT") 2>/dev/null && return; sleep 1; done
+  for _ in $(seq 30); do (exec 3<>/dev/tcp/127.0.0.1/"$ROUTER_PORT") 2>/dev/null && { PROXY_STARTED=1; return; }; sleep 1; done
   echo "kubectl ate proxy did not come up:" >&2; cat "$HERE/.proxy.log" >&2; exit 1
 }
 call() {  # call <script> [permit]: run_script on the actor, through the router
@@ -140,6 +144,13 @@ EOF
   kubectl create ns "$ATESPACE" --dry-run=client -o yaml | kubectl apply -f - >/dev/null
   ( cd "$SUBSTRATE_DIR" && KO_DOCKER_REPO=$reg go run github.com/google/ko@v0.18.0 resolve \
       --platform="linux/$(go env GOARCH)" -f "$HERE/manifests/workerpool.yaml" ) | kubectl apply -f -
+  # Templates are immutable: if the runner image changed, recreate the template and the actor
+  if ate get actor-template sandbox-runner -a "$ATESPACE" -o yaml 2>/dev/null | grep -q 'image:' &&
+     ! ate get actor-template sandbox-runner -a "$ATESPACE" -o yaml | grep -qF "$ref"; then
+    echo "runner image changed; recreating the template and $ACTOR"
+    ate delete actor "$ACTOR" -a "$ATESPACE" || true
+    ate delete actor-template sandbox-runner -a "$ATESPACE"
+  fi
   if ! ate get actor-template sandbox-runner -a "$ATESPACE" >/dev/null 2>&1; then
     sed "s|IMAGE|$ref|" "$HERE/manifests/actor-template.yaml" > "$HERE/.actor-template.yaml"
     ate create actor-template -f "$HERE/.actor-template.yaml"
