@@ -52,11 +52,13 @@ reset() { py_in mcp-tools "import urllib.request as u; u.urlopen(u.Request('http
 permit() {  # permit <scopes> [sub] -> a permit from the lab STS stand-in
   py_in sts "import urllib.request as u; print(u.urlopen('http://127.0.0.1:8080/mint?scope=${1// /+}&sub=${2:-tester}').read().decode())"
 }
-router() {  # keep a port-forward to Substrate's router open for this script
-  if ! curl -s -o /dev/null "localhost:$ROUTER_PORT" 2>/dev/null; then
-    kubectl -n ate-system port-forward svc/atenet-router "$ROUTER_PORT:80" >/dev/null 2>&1 &
-    sleep 3
-  fi
+router() {  # keep `kubectl ate proxy` open: localhost:$ROUTER_PORT -> the actor's port 80, via Substrate's router
+  # The router requires a client certificate, so a plain port-forward can't talk to it; the ate proxy mints one.
+  pkill -f "port-forward svc/atenet-router" 2>/dev/null || true   # left over from earlier versions of this script
+  pgrep -f "ate proxy actor $ACTOR" >/dev/null && (exec 3<>/dev/tcp/127.0.0.1/"$ROUTER_PORT") 2>/dev/null && return
+  kubectl ate proxy actor "$ACTOR" "$ROUTER_PORT:80" -a "$ATESPACE" >"$HERE/.proxy.log" 2>&1 &
+  for _ in $(seq 30); do (exec 3<>/dev/tcp/127.0.0.1/"$ROUTER_PORT") 2>/dev/null && return; sleep 1; done
+  echo "kubectl ate proxy did not come up:" >&2; cat "$HERE/.proxy.log" >&2; exit 1
 }
 call() {  # call <script> [permit]: run_script on the actor, through the router
   router
