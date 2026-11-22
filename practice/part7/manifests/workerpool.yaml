@@ -9,4 +9,8 @@ spec:
   workerImage: ko://go.ate.dev/substrate/cmd/ateworker-gvisor
   sandboxClasses:
   - name: gvisor
-    configRef: {name: gvisor-default}
+  template:
+    # One runner actor per worker: capacity matches the template's limits (actor-template.yaml)
+    resources:
+      limits: {cpu: "1", memory: 1Gi}
+      requests: {cpu: 250m, memory: 1Gi}

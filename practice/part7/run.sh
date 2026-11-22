@@ -81,12 +81,16 @@ up() {
   say "Agent Substrate $SUBSTRATE_REF on kind (Substrate's own dev path)"
   [[ -d "$SUBSTRATE_DIR/.git" ]] || git clone -q https://github.com/agent-substrate/substrate "$SUBSTRATE_DIR"
   git -C "$SUBSTRATE_DIR" fetch -q origin "$SUBSTRATE_REF" && git -C "$SUBSTRATE_DIR" checkout -q FETCH_HEAD
-  ( cd "$SUBSTRATE_DIR" || exit 1
-    hack/create-kind-cluster.sh
-    ATE_INSTALL_KIND=true go run ./cmd/ate-setup deploy ate-system \
-      --credential-provider='{"name":"k8s.io"}' \
-      --ingress-allowed-spiffe-ids=spiffe://cluster.local/ns/ate-system/sa/atenet-client
-    go install ./cmd/kubectl-ate )
+  if [[ -z "${PART7_REINSTALL:-}" ]] && kubectl -n ate-system rollout status deploy/ate-api-server --timeout=5s >/dev/null 2>&1; then
+    echo "Substrate is already running on this cluster; skipping the install (PART7_REINSTALL=1 to redo it)"
+  else
+    ( cd "$SUBSTRATE_DIR" || exit 1
+      hack/create-kind-cluster.sh
+      ATE_INSTALL_KIND=true go run ./cmd/ate-setup deploy ate-system \
+        --credential-provider='{"name":"k8s.io"}' \
+        --ingress-allowed-spiffe-ids=spiffe://cluster.local/ns/ate-system/sa/atenet-client )
+  fi
+  ( cd "$SUBSTRATE_DIR" && go install ./cmd/kubectl-ate )
 
   say "The highway image, the store, the lab STS and store-gate"
   docker build -q ${DOCKER_BUILD_FLAGS:-} -t "$IMAGE" "$REPO_ROOT/src" >/dev/null || \
@@ -112,12 +116,30 @@ EOF
   kubectl -n ate-system rollout status deployment/k8s-credential-provider --timeout=120s >/dev/null
 
   say "The runner as an actor: atespace, worker pool (gVisor), template, actor"
-  ate create atespace "$ATESPACE" 2>/dev/null || true
+  # Actor templates must pin images by digest, and the worker pool's ko:// image must be built:
+  # push the highway image to the kind registry and let ko resolve the pool (as ate-setup does).
+  local reg=localhost:5001 ref
+  docker tag "$IMAGE" "$reg/$IMAGE" && docker push -q "$reg/$IMAGE" >/dev/null
+  ref=$(docker inspect --format '{{index .RepoDigests 0}}' "$reg/$IMAGE" | grep "^$reg/")
+  echo "actor image: $ref"
+  ate get atespace "$ATESPACE" >/dev/null 2>&1 || ate create atespace "$ATESPACE"
   kubectl create ns "$ATESPACE" --dry-run=client -o yaml | kubectl apply -f - >/dev/null
-  kubectl apply -f "$HERE/manifests/workerpool.yaml" >/dev/null
-  sed "s|IMAGE|$IMAGE|" "$HERE/manifests/actor-template.yaml" > "$HERE/.actor-template.yaml"
-  ate create actor-template -f "$HERE/.actor-template.yaml" 2>/dev/null || true
-  ate create actor "$ACTOR" -a "$ATESPACE" --template sandbox-runner 2>/dev/null || true
+  ( cd "$SUBSTRATE_DIR" && KO_DOCKER_REPO=$reg go run github.com/google/ko@v0.18.0 resolve \
+      --platform="linux/$(go env GOARCH)" -f "$HERE/manifests/workerpool.yaml" ) | kubectl apply -f -
+  if ! ate get actor-template sandbox-runner -a "$ATESPACE" >/dev/null 2>&1; then
+    sed "s|IMAGE|$ref|" "$HERE/manifests/actor-template.yaml" > "$HERE/.actor-template.yaml"
+    ate create actor-template -f "$HERE/.actor-template.yaml"
+  fi
+  say "Waiting for the template's golden snapshot (first boot of the runner under gVisor)"
+  local st
+  for _ in $(seq 120); do   # up to 10 min (status.goldenSnapshotStatus.goldenTag / errorMessage)
+    st=$(ate get actor-template sandbox-runner -a "$ATESPACE" -o yaml 2>/dev/null || true)
+    grep -q 'goldenTag:' <<<"$st" && break
+    grep -q 'errorMessage:' <<<"$st" && { sed -n '/status:/,$p' <<<"$st"; echo "golden snapshot failed; see: task part7:doctor" >&2; exit 1; }
+    sleep 5
+  done
+  sed -n '/status:/,$p' <<<"$st"
+  ate get actor "$ACTOR" -a "$ATESPACE" >/dev/null 2>&1 || ate create actor "$ACTOR" -a "$ATESPACE" --template sandbox-runner
   ate get actor "$ACTOR" -a "$ATESPACE"
 }
 
