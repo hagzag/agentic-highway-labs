@@ -52,6 +52,17 @@ reset() { py_in mcp-tools "import urllib.request as u; u.urlopen(u.Request('http
 permit() {  # permit <scopes> [sub] -> a permit from the lab STS stand-in
   py_in sts "import urllib.request as u; print(u.urlopen('http://127.0.0.1:8080/mint?scope=${1// /+}&sub=${2:-tester}').read().decode())"
 }
+router_ready() {  # wait for atenet-router; heal the "envoy stuck DRAINING" state first
+  # When the atenet-router container restarts (e.g. a liveness failure after the VM slept), its
+  # shutdown hook drains the envoy sidecar. Envoy stays in DRAINING (/ready -> 503) because only
+  # the router container restarts, so the new router's dataplane check fails forever and the pod
+  # never becomes Ready. Only a fresh pod clears it.
+  if ! kubectl -n ate-system rollout status deploy/atenet-router --timeout=20s >/dev/null 2>&1; then
+    echo "atenet-router not Ready (envoy left DRAINING by a router restart?); recreating its pods" >&2
+    kubectl -n ate-system delete pod -l app=atenet-router --wait=false >/dev/null
+    kubectl -n ate-system rollout status deploy/atenet-router --timeout=180s >/dev/null
+  fi
+}
 router() {  # keep `kubectl ate proxy` open: localhost:$ROUTER_PORT -> the actor's port 80, via Substrate's router
   # The router requires a client certificate, so a plain port-forward can't talk to it; the ate proxy mints one.
   # One fresh proxy per script run: a proxy left from an earlier run keeps a stale view of the
@@ -59,7 +70,7 @@ router() {  # keep `kubectl ate proxy` open: localhost:$ROUTER_PORT -> the actor
   [[ -n "${PROXY_STARTED:-}" ]] && return
   pkill -f "port-forward svc/atenet-router" 2>/dev/null || true
   pkill -f "ate proxy actor" 2>/dev/null || true
-  kubectl -n ate-system rollout status deploy/atenet-router --timeout=120s >/dev/null
+  router_ready
   kubectl ate proxy actor "$ACTOR" "$ROUTER_PORT:80" -a "$ATESPACE" >"$HERE/.proxy.log" 2>&1 &
   for _ in $(seq 30); do (exec 3<>/dev/tcp/127.0.0.1/"$ROUTER_PORT") 2>/dev/null && { PROXY_STARTED=1; return; }; sleep 1; done
   echo "kubectl ate proxy did not come up:" >&2; cat "$HERE/.proxy.log" >&2; exit 1
@@ -73,6 +84,19 @@ call() {  # call <script> [permit]: run_script on the actor, through the router
 egress_policy() {  # egress_policy <file|none>: replace the actor's EgressPolicy
   ate delete egress-policy "$ACTOR" -a "$ATESPACE" >/dev/null 2>&1 || true
   [[ "$1" == none ]] || ate create egress-policy "$ACTOR" -a "$ATESPACE" -f "$HERE/manifests/$1"
+  # The policy reaches a running actor asynchronously; a call made at once can still see the
+  # old one (default deny -> ConnectError). Give it a moment.
+  sleep "${EGRESS_SETTLE:-10}"
+}
+call_settled() {  # call_settled <script> [permit]: retry while every request is ConnectError
+  # (policy not applied yet). Safe to repeat: a ConnectError never reached the store.
+  local out; router   # start the proxy in this shell, not in the $(...) subshell below
+  for _ in 1 2 3 4 5 6; do
+    out="$(call "$@")"
+    grep -q '=[0-9]' <<<"$out" && break
+    echo "(egress policy not applied yet: $(tr '\n' ' ' <<<"$out")- retrying)" >&2; sleep 5
+  done
+  echo "$out"
 }
 actor_jwks() {  # Substrate's IdP (cmd/ate-idp-server): Service "idp" (443/TLS), JWKS at /openid/v1/jwks
   echo "${ACTOR_JWKS_URL:-https://idp.ate-system.svc/openid/v1/jwks}"
@@ -178,7 +202,7 @@ break_it() {
   say "BREAK: grant the store credential (replaceHeaders + credentialUri). The poisoned cleanup script runs"
   reset; state
   egress_policy egress-break.yaml
-  call cleanup-direct.py
+  call_settled cleanup-direct.py
   state
   echo "The actor never held the token; Substrate's egress gateway added it. Nothing asked on whose behalf."
 }
@@ -188,7 +212,7 @@ fix() {
   reset
   egress_policy egress-fix.yaml
   say "tester's permit (no buckets:delete)"
-  call cleanup-gate.py "$(permit 'buckets:read buckets:copy scripts:run')"
+  call_settled cleanup-gate.py "$(permit 'buckets:read buckets:copy scripts:run')"
   say "ops-admin's permit (holds buckets:delete): the retention lock still holds"
   call cleanup-gate.py "$(permit 'buckets:read buckets:delete scripts:run' ops-admin)"
   say "no permit"
@@ -198,16 +222,24 @@ fix() {
   k logs deploy/store-gate -c store-gate --tail=20 | grep -E 'egress=' || true
 }
 
-doctor() {
-  kubectl -n ate-system get pods
-  ate get actor "$ACTOR" -a "$ATESPACE" || true
-  ate get egress-policy "$ACTOR" -a "$ATESPACE" -o yaml || true
-  k get pods
-  kubectl -n ate-system logs deployment/atenet-egress --all-containers --tail=30 2>/dev/null | grep -iE 'denied|credential' || true
+doctor() {  # everything needed to see why a step hangs; also saved to captured/kind/doctor.txt by capture
+  set +e
+  say "ate-system pods"; kubectl -n ate-system get pods -o wide
+  say "atenet-router"; kubectl -n ate-system describe deploy/atenet-router | sed -n '/Replicas/,/Events/p'
+  kubectl -n ate-system get pods -l app=atenet-router -o name | head -1 | xargs -r kubectl -n ate-system describe | tail -25
+  kubectl -n ate-system logs deploy/atenet-router --all-containers --tail=40
+  say "actor, template, workers"; ate get actor "$ACTOR" -a "$ATESPACE"; ate get workers; kubectl -n "$ATESPACE" get pods -o wide
+  ate logs actor "$ACTOR" -a "$ATESPACE" --source lifecycle 2>&1 | tail -20
+  ate get egress-policy "$ACTOR" -a "$ATESPACE" -o yaml
+  say "proxy log"; cat "$HERE/.proxy.log" 2>/dev/null
+  say "highway pods"; k get pods
+  kubectl -n ate-system logs deployment/atenet-egress --all-containers --tail=30 2>/dev/null | grep -iE 'denied|credential|error' | tail -15
+  say "node"; kubectl top node 2>/dev/null; free -m; df -h / | tail -1
 }
 
 capture() {
   mkdir -p "$OUT"
+  trap 'doctor > "$OUT/doctor.txt" 2>&1' EXIT   # whatever happens, leave the diagnostics next to the captures
   up       2>&1 | tee "$OUT/00-up.txt"
   paved    2>&1 | tee "$OUT/01-paved.txt"
   break_it 2>&1 | tee "$OUT/02-break.txt"

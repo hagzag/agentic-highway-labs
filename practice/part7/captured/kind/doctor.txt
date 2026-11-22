@@ -1,0 +1,260 @@
+
+[1;36m==> ate-system pods[0m
+NAME                                       READY   STATUS      RESTARTS       AGE     IP            NODE                 NOMINATED NODE   READINESS GATES
+ate-api-server-79cfb95fbb-6xcm5            2/2     Running     4 (17m ago)    9h      10.244.0.8    kind-control-plane   <none>           <none>
+ate-api-server-79cfb95fbb-c22bn            2/2     Running     3 (92m ago)    9h      10.244.0.9    kind-control-plane   <none>           <none>
+ate-controller-747ddf6447-l5hm2            1/1     Running     0              9h      10.244.0.10   kind-control-plane   <none>           <none>
+ate-idp-server-5dcbc57446-lf6bq            1/1     Running     2 (92m ago)    9h      10.244.0.13   kind-control-plane   <none>           <none>
+ate-idp-server-5dcbc57446-xw9n7            1/1     Running     2 (92m ago)    9h      10.244.0.12   kind-control-plane   <none>           <none>
+atelet-g9gqh                               2/2     Running     1 (3h3m ago)   9h      10.244.0.11   kind-control-plane   <none>           <none>
+atenet-egress-6695c766f8-cz7dh             3/3     Running     0              9h      10.244.0.22   kind-control-plane   <none>           <none>
+atenet-router-698b699c65-wp64d             2/2     Running     0              2m36s   10.244.0.51   kind-control-plane   <none>           <none>
+k8s-credential-provider-8488957c9c-6plpn   1/1     Running     0              66s     10.244.0.55   kind-control-plane   <none>           <none>
+postgres-0                                 2/2     Running     1 (92m ago)    9h      10.244.0.7    kind-control-plane   <none>           <none>
+rustfs-5885bc6668-frz7n                    1/1     Running     0              9h      10.244.0.20   kind-control-plane   <none>           <none>
+rustfs-bucket-init-vh7sh                   0/1     Completed   0              9h      10.244.0.14   kind-control-plane   <none>           <none>
+
+[1;36m==> atenet-router[0m
+Replicas:               1 desired | 1 updated | 1 total | 1 available | 0 unavailable
+StrategyType:           RollingUpdate
+MinReadySeconds:        0
+RollingUpdateStrategy:  25% max unavailable, 25% max surge
+Pod Template:
+  Labels:           app=atenet-router
+  Annotations:      prometheus.io/port: 9090
+                    prometheus.io/scrape: true
+  Service Account:  atenet-router
+  Containers:
+   atenet-router:
+    Image:       localhost:5001/atenet@sha256:788ef9b337c2160d190911102936c42468119e137a2d772cd60330a17255a273
+    Ports:       50051/TCP (extproc), 9090/TCP (metrics), 9091/TCP (health)
+    Host Ports:  0/TCP (extproc), 0/TCP (metrics), 0/TCP (health)
+    Args:
+      router
+      --mode=ingress
+      --namespace=ate-system
+      --port-xds=18000
+      --port-extproc=50051
+      --extproc-address=127.0.0.1
+      --status-port=4040
+      --port-https=8443
+      --envoy-cert-path=/run/servicedns.podcert.ate.dev/credential-bundle.pem
+      --port-connect-tls=8444
+      --ingress-client-ca-file=/run/podidentity.podcert.ate.dev/trust-bundle.pem
+      --ateapi-address=k8s:///api.ate-system.svc:443
+      --ateapi-ca-file=/run/servicedns-ca/trust-bundle.pem
+      --ateapi-client-cert=/run/podidentity.podcert.ate.dev/credential-bundle.pem
+      --drain-delay=13s
+      --ingress-allowed-spiffe-ids=spiffe://cluster.local/ns/ate-system/sa/atenet-client
+      --preview=
+    Liveness:   http-get http://:health/healthz delay=10s timeout=1s period=10s successThreshold=1 failureThreshold=3
+    Readiness:  http-get http://:health/readyz delay=5s timeout=1s period=2s successThreshold=1 failureThreshold=3
+    Environment Variables from:
+      ate-otel-config  ConfigMap  Optional: false
+    Environment:
+      POD_NAME:                   (v1:metadata.name)
+      POD_NAMESPACE:              (v1:metadata.namespace)
+      POD_UID:                    (v1:metadata.uid)
+      OTEL_RESOURCE_ATTRIBUTES:  k8s.namespace.name=$(POD_NAMESPACE),k8s.pod.name=$(POD_NAME),k8s.pod.uid=$(POD_UID),service.instance.id=$(POD_UID)
+    Mounts:
+      /run/podidentity.podcert.ate.dev from podidentity (rw)
+      /run/servicedns-ca from servicedns-ca (rw)
+      /var/run/atenet from drain-signal (rw)
+   envoy:
+    Image:       localhost:5001/envoy-dataplane@sha256:1b5cbb2e47ea94c17d341f28afe00f3f907180c3f214079f77653dfe29a38956
+    Ports:       8443/TCP (https), 8444/TCP (connect-tls), 9902/TCP (envoy-metrics)
+    Host Ports:  0/TCP (https), 0/TCP (connect-tls), 0/TCP (envoy-metrics)
+    Command:
+      /usr/local/bin/envoy
+      -c
+      /etc/envoy/envoy.yaml
+    Readiness:    http-get http://:envoy-metrics/ready delay=0s timeout=1s period=2s successThreshold=1 failureThreshold=3
+    Environment:  <none>
+    Mounts:
+      /etc/envoy from envoy-config (rw)
+      /run/podidentity.podcert.ate.dev from podidentity (rw)
+      /run/servicedns.podcert.ate.dev from servicedns (rw)
+      /var/run/atenet from drain-signal (ro)
+  Volumes:
+   envoy-config:
+    Type:      ConfigMap (a volume populated by a ConfigMap)
+    Name:      atenet-router-envoy-config
+    Optional:  false
+   drain-signal:
+    Type:       EmptyDir (a temporary directory that shares a pod's lifetime)
+    Medium:     
+    SizeLimit:  <unset>
+   servicedns:
+    Type:  Projected (a volume that contains injected data from multiple sources)
+   podidentity:
+    Type:  Projected (a volume that contains injected data from multiple sources)
+   servicedns-ca:
+    Type:          Projected (a volume that contains injected data from multiple sources)
+  Node-Selectors:  <none>
+  Tolerations:     <none>
+Conditions:
+  Type           Status  Reason
+  ----           ------  ------
+  Progressing    True    NewReplicaSetAvailable
+  Available      True    MinimumReplicasAvailable
+OldReplicaSets:  <none>
+NewReplicaSet:   atenet-router-698b699c65 (1/1 replicas created)
+Events:          <none>
+  podidentity:
+    Type:  Projected (a volume that contains injected data from multiple sources)
+  servicedns-ca:
+    Type:  Projected (a volume that contains injected data from multiple sources)
+  kube-api-access-whx9s:
+    Type:                    Projected (a volume that contains injected data from multiple sources)
+    TokenExpirationSeconds:  3607
+    ConfigMapName:           kube-root-ca.crt
+    Optional:                false
+    DownwardAPI:             true
+QoS Class:                   BestEffort
+Node-Selectors:              <none>
+Tolerations:                 node.kubernetes.io/not-ready:NoExecute op=Exists for 300s
+                             node.kubernetes.io/unreachable:NoExecute op=Exists for 300s
+Events:
+  Type     Reason     Age    From               Message
+  ----     ------     ----   ----               -------
+  Normal   Scheduled  2m35s  default-scheduler  Successfully assigned ate-system/atenet-router-698b699c65-wp64d to kind-control-plane
+  Normal   Pulled     2m35s  kubelet            spec.containers{atenet-router}: Container image "localhost:5001/atenet@sha256:788ef9b337c2160d190911102936c42468119e137a2d772cd60330a17255a273" already present on machine and can be accessed by the pod
+  Normal   Created    2m35s  kubelet            spec.containers{atenet-router}: Container created
+  Normal   Started    2m35s  kubelet            spec.containers{atenet-router}: Container started
+  Normal   Pulled     2m35s  kubelet            spec.containers{envoy}: Container image "localhost:5001/envoy-dataplane@sha256:1b5cbb2e47ea94c17d341f28afe00f3f907180c3f214079f77653dfe29a38956" already present on machine and can be accessed by the pod
+  Normal   Created    2m35s  kubelet            spec.containers{envoy}: Container created
+  Normal   Started    2m35s  kubelet            spec.containers{envoy}: Container started
+  Warning  Unhealthy  2m35s  kubelet            spec.containers{envoy}: Readiness probe failed: Get "http://10.244.0.51:9902/ready": dial tcp 10.244.0.51:9902: connect: connection refused
+[2026-11-22T19:33:03.759Z] "CONNECT - HTTP/1.1" 200 DC 2326 1834 1920 - "-" "Go-http-client/1.1" "4494ad53-1de7-4482-b33b-92f9c6da9ed7" "runner-1:80" "envoy://main_internal/"
+[2026-11-22T19:33:08.044Z] "CONNECT - HTTP/1.1" 200 DC 0 0 7 - "-" "Go-http-client/1.1" "984344de-1501-49b7-8b64-93527306cef8" "runner-1:80" "envoy://main_internal/"
+[2026-11-22T19:33:08.996Z] "POST /mcp HTTP/1.1" 200 - 245 340 13 7 "-" "python-httpx2/2.16.2" "e9d87aa6-3abb-446d-9bc6-75841a22a3f4" "localhost:18000" "envoy://actor_connect/"
+[2026-11-22T19:33:09.012Z] "POST /mcp HTTP/1.1" 200 - 668 309 37 33 "-" "python-httpx2/2.16.2" "c55dd277-d7f4-44aa-b4fa-42c1b859ae1c" "localhost:18000" "envoy://actor_connect/"
+[2026-11-22T19:33:09.052Z] "POST /mcp HTTP/1.1" 200 - 240 642 38 34 "-" "python-httpx2/2.16.2" "1121699c-3b64-4a79-b4dc-c4428da27138" "localhost:18000" "envoy://actor_connect/"
+[2026-11-22T19:33:08.995Z] "CONNECT - HTTP/1.1" 200 DC 2230 1767 157 - "-" "Go-http-client/1.1" "af91f8ef-f81c-4424-8bde-33c556262933" "runner-1:80" "envoy://main_internal/"
+[2026-11-22T19:33:11.407Z] "CONNECT - HTTP/1.1" 200 DC 0 0 4 - "-" "Go-http-client/1.1" "a5a7e74f-dea8-4486-86b3-065657e77ed0" "runner-1:80" "envoy://main_internal/"
+[2026-11-22T19:33:12.259Z] "POST /mcp HTTP/1.1" 200 - 245 340 63 45 "-" "python-httpx2/2.16.2" "ca84950e-5ee0-4e16-90ba-e58906c4a6d6" "localhost:18000" "envoy://actor_connect/"
+[2026-11-22T19:33:12.330Z] "POST /mcp HTTP/1.1" 200 - 815 565 1096 1082 "-" "python-httpx2/2.16.2" "dfd8a44d-49be-4dfb-9fad-382235d606f9" "localhost:18000" "envoy://actor_connect/"
+[2026-11-22T19:33:13.430Z] "POST /mcp HTTP/1.1" 200 - 240 642 5 1 "-" "python-httpx2/2.16.2" "dff10619-cbf0-457e-80cd-360443912bac" "localhost:18000" "envoy://actor_connect/"
+[2026-11-22T19:33:12.256Z] "CONNECT - HTTP/1.1" 200 DC 4237 2025 1222 - "-" "Go-http-client/1.1" "48033cd8-7655-401e-b612-4e3eaa816adb" "runner-1:80" "envoy://main_internal/"
+[2026-11-22T19:33:05.126Z] tunnel actor=highway/runner-1 port=80 "10.244.0.46:8443" - connect_response={"headers":[{"key":":status","value":"200"},{"key":"date","value":"Sun, 22 Nov 2026 19:33:05 GMT"}]} 5402 3404 8966
+[2026-11-22T19:33:14.393Z] "POST /mcp HTTP/1.1" 200 - 245 340 9 4 "-" "python-httpx2/2.16.2" "8005cde8-268d-41ea-a533-c812e2824a81" "localhost:18000" "envoy://actor_connect/"
+[2026-11-22T19:33:14.406Z] "POST /mcp HTTP/1.1" 200 - 815 493 87 84 "-" "python-httpx2/2.16.2" "c242a6e5-edbb-46cd-b6e4-48a5b49cf234" "localhost:18000" "envoy://actor_connect/"
+[2026-11-22T19:33:14.495Z] "POST /mcp HTTP/1.1" 200 - 240 642 3 0 "-" "python-httpx2/2.16.2" "60e564ba-7533-4003-a6c9-6bfa74940dfb" "localhost:18000" "envoy://actor_connect/"
+[2026-11-22T19:33:14.392Z] "CONNECT - HTTP/1.1" 200 DC 4258 1950 130 - "-" "Go-http-client/1.1" "debbdab9-9252-4c36-99d4-04d4a4ea8384" "runner-1:80" "envoy://main_internal/"
+[2026-11-22T19:33:15.175Z] "POST /mcp HTTP/1.1" 200 - 245 340 4 1 "-" "python-httpx2/2.16.2" "e1b0fbaa-4c6e-421d-b5c3-38ce0e46849d" "localhost:18000" "envoy://actor_connect/"
+[2026-11-22T19:33:15.182Z] "POST /mcp HTTP/1.1" 200 - 815 529 42 40 "-" "python-httpx2/2.16.2" "ea0d5cb2-0987-4dc7-95ac-b64f93ba48a4" "localhost:18000" "envoy://actor_connect/"
+[2026-11-22T19:33:15.230Z] "POST /mcp HTTP/1.1" 200 - 240 642 7 2 "-" "python-httpx2/2.16.2" "c4c8e638-e7e4-4711-aa06-a87184ded3aa" "localhost:18000" "envoy://actor_connect/"
+[2026-11-22T19:33:15.174Z] "CONNECT - HTTP/1.1" 200 DC 2377 1986 110 - "-" "Go-http-client/1.1" "695499e7-87bd-41bd-b6ea-c3aefe1c4300" "runner-1:80" "envoy://main_internal/"
+[2026-11-22T19:33:12.276Z] tunnel actor=highway/runner-1 port=80 "10.244.0.46:8443" - connect_response={"headers":[{"key":":status","value":"200"},{"key":"date","value":"Sun, 22 Nov 2026 19:33:12 GMT"}]} 4660 1925 6166
+[2026-11-22T19:33:14.397Z] tunnel actor=highway/runner-1 port=80 "10.244.0.46:8443" - connect_response={"headers":[{"key":":status","value":"200"},{"key":"date","value":"Sun, 22 Nov 2026 19:33:14 GMT"}]} 7481 3742 5846
+[2026-11-22T19:33:54.285Z] "CONNECT - HTTP/1.1" 200 DC 0 0 2 - "-" "Go-http-client/1.1" "50c433d7-98dc-4546-b972-4b9284def4e5" "runner-1:80" "envoy://main_internal/"
+[2026-11-22T19:33:55.447Z] "POST /mcp HTTP/1.1" 200 - 245 340 63 49 "-" "python-httpx2/2.16.2" "93ad38b0-4242-450f-8030-dbb673a1f503" "localhost:18000" "envoy://actor_connect/"
+[2026-11-22T19:33:55.514Z] "POST /mcp HTTP/1.1" 200 - 668 449 461 454 "-" "python-httpx2/2.16.2" "492d1f74-9890-45b9-8ced-d3e88a68f520" "localhost:18000" "envoy://actor_connect/"
+[2026-11-22T19:33:55.977Z] "POST /mcp HTTP/1.1" 200 - 240 642 6 1 "-" "python-httpx2/2.16.2" "25023dc3-e6a4-4985-bdfd-daacb9bbe0b3" "localhost:18000" "envoy://actor_connect/"
+[2026-11-22T19:33:55.446Z] "CONNECT - HTTP/1.1" 200 DC 2230 1908 568 - "-" "Go-http-client/1.1" "6b960c89-c6c3-49e0-8dc2-f80d1e373c8e" "runner-1:80" "envoy://main_internal/"
+[2026-11-22T19:33:55.460Z] tunnel actor=highway/runner-1 port=80 "10.244.0.46:8443" - connect_response={"headers":[{"key":":status","value":"200"},{"key":"date","value":"Sun, 22 Nov 2026 19:33:55 GMT"}]} 2653 1809 5528
+[2026-11-22T19:35:02.824Z] "CONNECT - HTTP/1.1" 200 DC 0 0 7 - "-" "Go-http-client/1.1" "fd33dcf0-c3da-4862-85e6-3d0b937f055f" "runner-1:80" "envoy://main_internal/"
+[2026-11-22T19:35:03.455Z] "POST /mcp HTTP/1.1" 200 - 245 340 277 18 "-" "python-httpx2/2.16.2" "84924a27-0503-41c0-ab1b-bdaf100cffd5" "localhost:18000" "envoy://actor_connect/"
+[2026-11-22T19:35:03.737Z] "POST /mcp HTTP/1.1" 200 - 764 375 72 69 "-" "python-httpx2/2.16.2" "f37c6aba-dc8f-4e14-a220-170007b3b727" "localhost:18000" "envoy://actor_connect/"
+[2026-11-22T19:35:03.811Z] "POST /mcp HTTP/1.1" 200 - 240 642 3 0 "-" "python-httpx2/2.16.2" "b26a8f21-2aa6-4daf-abd2-c68541ffee9f" "localhost:18000" "envoy://actor_connect/"
+[2026-11-22T19:35:03.454Z] "CONNECT - HTTP/1.1" 200 DC 2326 1833 380 - "-" "Go-http-client/1.1" "b29c1a88-849d-4a9c-a65b-cff895ab624a" "runner-1:80" "envoy://main_internal/"
+[2026-11-22T19:35:03.706Z] tunnel actor=highway/runner-1 port=80 "10.244.0.45:8443" - connect_response={"headers":[{"key":":status","value":"200"},{"key":"date","value":"Sun, 22 Nov 2026 19:35:03 GMT"}]} 2749 1735 5112
+[2026-11-22T19:35:15.417Z] "CONNECT - HTTP/1.1" 200 DC 0 0 1 - "-" "Go-http-client/1.1" "9aef40ce-8b47-46fa-bd09-a2ec0969757a" "runner-1:80" "envoy://main_internal/"
+[2026-11-22T19:35:15.974Z] "POST /mcp HTTP/1.1" 200 - 245 340 31 21 "-" "python-httpx2/2.16.2" "fb6bf7a3-0bb1-4706-bb81-d94be64feafc" "localhost:18000" "envoy://actor_connect/"
+[2026-11-22T19:35:16.009Z] "POST /mcp HTTP/1.1" 200 - 668 449 114 109 "-" "python-httpx2/2.16.2" "5493bc0e-32b3-457e-8ac1-05ef7ad8f7b8" "localhost:18000" "envoy://actor_connect/"
+[2026-11-22T19:35:16.125Z] "POST /mcp HTTP/1.1" 200 - 240 642 3 1 "-" "python-httpx2/2.16.2" "52d1a74d-4803-43bc-9d64-8cf5a6010aa3" "localhost:18000" "envoy://actor_connect/"
+[2026-11-22T19:35:15.973Z] "CONNECT - HTTP/1.1" 200 DC 2230 1908 184 - "-" "Go-http-client/1.1" "4ca929b2-2636-4f03-91d2-86441ee3fc93" "runner-1:80" "envoy://main_internal/"
+[2026-11-22T19:35:15.982Z] tunnel actor=highway/runner-1 port=80 "10.244.0.45:8443" - connect_response={"headers":[{"key":":status","value":"200"},{"key":"date","value":"Sun, 22 Nov 2026 19:35:15 GMT"}]} 2653 1809 5148
+{"time":"2026-11-22T19:35:26.627427489Z","level":"INFO","msg":"Checking health"}
+{"time":"2026-11-22T19:35:27.62680382Z","level":"INFO","msg":"Checking health"}
+{"time":"2026-11-22T19:35:28.493453408Z","level":"INFO","msg":"Request","host":"localhost:18000","trace_id":"20e0296b3b2273c583f0c638da1d45bf","span_id":"a514136b49e4dbc7","trace_flags":"00"}
+{"time":"2026-11-22T19:35:28.493584812Z","level":"INFO","msg":"ResumeActor","actor":{"type":"*ateapi.Actor","atespace":"highway","name":"runner-1"},"trace_id":"20e0296b3b2273c583f0c638da1d45bf","span_id":"079ec4a09566d720","trace_flags":"00"}
+{"time":"2026-11-22T19:35:28.496257431Z","level":"INFO","msg":"ResumeActor result","actor":{"type":"*ateapi.Actor","atespace":"highway","name":"runner-1"},"state":"ACTOR_STATE_RUNNING","workerIP":"10.244.0.45","workerSPIFFEID":"spiffe://cluster.local/ns/highway/sa/ateworker","trace_id":"20e0296b3b2273c583f0c638da1d45bf","span_id":"079ec4a09566d720","trace_flags":"00"}
+{"time":"2026-11-22T19:35:28.496274805Z","level":"INFO","msg":"Route ok","actor":{"type":"*ateapi.Actor","atespace":"highway","name":"runner-1"},"targetAddr":"10.244.0.45:443","trace_id":"20e0296b3b2273c583f0c638da1d45bf","span_id":"079ec4a09566d720","trace_flags":"00"}
+{"time":"2026-11-22T19:35:28.507663006Z","level":"INFO","msg":"Request","host":"localhost:18000","trace_id":"2074a19d6ec1a2ac3033517a81c2f34c","span_id":"9273138cc6a4f1e0","trace_flags":"00"}
+{"time":"2026-11-22T19:35:28.507698211Z","level":"INFO","msg":"ResumeActor","actor":{"type":"*ateapi.Actor","atespace":"highway","name":"runner-1"},"trace_id":"2074a19d6ec1a2ac3033517a81c2f34c","span_id":"76cf0aa02a1e9cf8","trace_flags":"00"}
+{"time":"2026-11-22T19:35:28.510091273Z","level":"INFO","msg":"ResumeActor result","actor":{"type":"*ateapi.Actor","atespace":"highway","name":"runner-1"},"state":"ACTOR_STATE_RUNNING","workerIP":"10.244.0.45","workerSPIFFEID":"spiffe://cluster.local/ns/highway/sa/ateworker","trace_id":"2074a19d6ec1a2ac3033517a81c2f34c","span_id":"76cf0aa02a1e9cf8","trace_flags":"00"}
+{"time":"2026-11-22T19:35:28.51010623Z","level":"INFO","msg":"Route ok","actor":{"type":"*ateapi.Actor","atespace":"highway","name":"runner-1"},"targetAddr":"10.244.0.45:443","trace_id":"2074a19d6ec1a2ac3033517a81c2f34c","span_id":"76cf0aa02a1e9cf8","trace_flags":"00"}
+{"time":"2026-11-22T19:35:28.627666096Z","level":"INFO","msg":"Checking health"}
+{"time":"2026-11-22T19:35:28.701314125Z","level":"INFO","msg":"Request","host":"localhost:18000","trace_id":"cb2f9f730ce5da2bcc06e70e43accc13","span_id":"6c73b418ca03e8fe","trace_flags":"00"}
+{"time":"2026-11-22T19:35:28.701379661Z","level":"INFO","msg":"ResumeActor","actor":{"type":"*ateapi.Actor","atespace":"highway","name":"runner-1"},"trace_id":"cb2f9f730ce5da2bcc06e70e43accc13","span_id":"0effef9795d89169","trace_flags":"00"}
+{"time":"2026-11-22T19:35:28.703285978Z","level":"INFO","msg":"ResumeActor result","actor":{"type":"*ateapi.Actor","atespace":"highway","name":"runner-1"},"state":"ACTOR_STATE_RUNNING","workerIP":"10.244.0.45","workerSPIFFEID":"spiffe://cluster.local/ns/highway/sa/ateworker","trace_id":"cb2f9f730ce5da2bcc06e70e43accc13","span_id":"0effef9795d89169","trace_flags":"00"}
+{"time":"2026-11-22T19:35:28.703297102Z","level":"INFO","msg":"Route ok","actor":{"type":"*ateapi.Actor","atespace":"highway","name":"runner-1"},"targetAddr":"10.244.0.45:443","trace_id":"cb2f9f730ce5da2bcc06e70e43accc13","span_id":"0effef9795d89169","trace_flags":"00"}
+{"time":"2026-11-22T19:35:29.348215939Z","level":"INFO","msg":"Request","host":"localhost:18000","trace_id":"1045695096de23ed2367fae82ec5543c","span_id":"51196e023df740f0","trace_flags":"00"}
+{"time":"2026-11-22T19:35:29.348251269Z","level":"INFO","msg":"ResumeActor","actor":{"type":"*ateapi.Actor","atespace":"highway","name":"runner-1"},"trace_id":"1045695096de23ed2367fae82ec5543c","span_id":"2ebcd850ce1e3995","trace_flags":"00"}
+{"time":"2026-11-22T19:35:29.349640678Z","level":"INFO","msg":"ResumeActor result","actor":{"type":"*ateapi.Actor","atespace":"highway","name":"runner-1"},"state":"ACTOR_STATE_RUNNING","workerIP":"10.244.0.45","workerSPIFFEID":"spiffe://cluster.local/ns/highway/sa/ateworker","trace_id":"1045695096de23ed2367fae82ec5543c","span_id":"2ebcd850ce1e3995","trace_flags":"00"}
+{"time":"2026-11-22T19:35:29.349654677Z","level":"INFO","msg":"Route ok","actor":{"type":"*ateapi.Actor","atespace":"highway","name":"runner-1"},"targetAddr":"10.244.0.45:443","trace_id":"1045695096de23ed2367fae82ec5543c","span_id":"2ebcd850ce1e3995","trace_flags":"00"}
+{"time":"2026-11-22T19:35:29.35529768Z","level":"INFO","msg":"Request","host":"localhost:18000","trace_id":"a1ab41671f9c31090e77a1254e517739","span_id":"56211875f6583ae6","trace_flags":"00"}
+{"time":"2026-11-22T19:35:29.355340551Z","level":"INFO","msg":"ResumeActor","actor":{"type":"*ateapi.Actor","atespace":"highway","name":"runner-1"},"trace_id":"a1ab41671f9c31090e77a1254e517739","span_id":"7bf2d47d6036fd9e","trace_flags":"00"}
+{"time":"2026-11-22T19:35:29.356791454Z","level":"INFO","msg":"ResumeActor result","actor":{"type":"*ateapi.Actor","atespace":"highway","name":"runner-1"},"state":"ACTOR_STATE_RUNNING","workerIP":"10.244.0.45","workerSPIFFEID":"spiffe://cluster.local/ns/highway/sa/ateworker","trace_id":"a1ab41671f9c31090e77a1254e517739","span_id":"7bf2d47d6036fd9e","trace_flags":"00"}
+{"time":"2026-11-22T19:35:29.356803412Z","level":"INFO","msg":"Route ok","actor":{"type":"*ateapi.Actor","atespace":"highway","name":"runner-1"},"targetAddr":"10.244.0.45:443","trace_id":"a1ab41671f9c31090e77a1254e517739","span_id":"7bf2d47d6036fd9e","trace_flags":"00"}
+{"time":"2026-11-22T19:35:29.410068749Z","level":"INFO","msg":"Request","host":"localhost:18000","trace_id":"0774e9298dc57e98fd59286ca621485d","span_id":"9bd833537fc300e1","trace_flags":"00"}
+{"time":"2026-11-22T19:35:29.410098121Z","level":"INFO","msg":"ResumeActor","actor":{"type":"*ateapi.Actor","atespace":"highway","name":"runner-1"},"trace_id":"0774e9298dc57e98fd59286ca621485d","span_id":"48d63ef23b17937c","trace_flags":"00"}
+{"time":"2026-11-22T19:35:29.41124322Z","level":"INFO","msg":"ResumeActor result","actor":{"type":"*ateapi.Actor","atespace":"highway","name":"runner-1"},"state":"ACTOR_STATE_RUNNING","workerIP":"10.244.0.45","workerSPIFFEID":"spiffe://cluster.local/ns/highway/sa/ateworker","trace_id":"0774e9298dc57e98fd59286ca621485d","span_id":"48d63ef23b17937c","trace_flags":"00"}
+{"time":"2026-11-22T19:35:29.411252345Z","level":"INFO","msg":"Route ok","actor":{"type":"*ateapi.Actor","atespace":"highway","name":"runner-1"},"targetAddr":"10.244.0.45:443","trace_id":"0774e9298dc57e98fd59286ca621485d","span_id":"48d63ef23b17937c","trace_flags":"00"}
+{"time":"2026-11-22T19:35:29.626821456Z","level":"INFO","msg":"Checking health"}
+{"time":"2026-11-22T19:35:29.918851151Z","level":"INFO","msg":"Request","host":"localhost:18000","trace_id":"712893a3f1508d72f121ccd9fcf04043","span_id":"ecab699433ce403a","trace_flags":"00"}
+{"time":"2026-11-22T19:35:29.918893563Z","level":"INFO","msg":"ResumeActor","actor":{"type":"*ateapi.Actor","atespace":"highway","name":"runner-1"},"trace_id":"712893a3f1508d72f121ccd9fcf04043","span_id":"39455f82ede2cd9b","trace_flags":"00"}
+{"time":"2026-11-22T19:35:29.920438374Z","level":"INFO","msg":"ResumeActor result","actor":{"type":"*ateapi.Actor","atespace":"highway","name":"runner-1"},"state":"ACTOR_STATE_RUNNING","workerIP":"10.244.0.45","workerSPIFFEID":"spiffe://cluster.local/ns/highway/sa/ateworker","trace_id":"712893a3f1508d72f121ccd9fcf04043","span_id":"39455f82ede2cd9b","trace_flags":"00"}
+{"time":"2026-11-22T19:35:29.92044854Z","level":"INFO","msg":"Route ok","actor":{"type":"*ateapi.Actor","atespace":"highway","name":"runner-1"},"targetAddr":"10.244.0.45:443","trace_id":"712893a3f1508d72f121ccd9fcf04043","span_id":"39455f82ede2cd9b","trace_flags":"00"}
+{"time":"2026-11-22T19:35:29.925773324Z","level":"INFO","msg":"Request","host":"localhost:18000","trace_id":"86f0640ba07d7c64fc8f9ac1fb8f10c1","span_id":"d0d6db8de0370cd1","trace_flags":"00"}
+{"time":"2026-11-22T19:35:29.925815945Z","level":"INFO","msg":"ResumeActor","actor":{"type":"*ateapi.Actor","atespace":"highway","name":"runner-1"},"trace_id":"86f0640ba07d7c64fc8f9ac1fb8f10c1","span_id":"d7cd4088b8ca15b6","trace_flags":"00"}
+{"time":"2026-11-22T19:35:29.927050494Z","level":"INFO","msg":"ResumeActor result","actor":{"type":"*ateapi.Actor","atespace":"highway","name":"runner-1"},"state":"ACTOR_STATE_RUNNING","workerIP":"10.244.0.45","workerSPIFFEID":"spiffe://cluster.local/ns/highway/sa/ateworker","trace_id":"86f0640ba07d7c64fc8f9ac1fb8f10c1","span_id":"d7cd4088b8ca15b6","trace_flags":"00"}
+{"time":"2026-11-22T19:35:29.927062284Z","level":"INFO","msg":"Route ok","actor":{"type":"*ateapi.Actor","atespace":"highway","name":"runner-1"},"targetAddr":"10.244.0.45:443","trace_id":"86f0640ba07d7c64fc8f9ac1fb8f10c1","span_id":"d7cd4088b8ca15b6","trace_flags":"00"}
+{"time":"2026-11-22T19:35:29.962801585Z","level":"INFO","msg":"Request","host":"localhost:18000","trace_id":"c8be859e406a33a990fdaa070adb921f","span_id":"d9c4062ea4edcde8","trace_flags":"00"}
+{"time":"2026-11-22T19:35:29.962832415Z","level":"INFO","msg":"ResumeActor","actor":{"type":"*ateapi.Actor","atespace":"highway","name":"runner-1"},"trace_id":"c8be859e406a33a990fdaa070adb921f","span_id":"eaecccedf144e79d","trace_flags":"00"}
+{"time":"2026-11-22T19:35:29.963957933Z","level":"INFO","msg":"ResumeActor result","actor":{"type":"*ateapi.Actor","atespace":"highway","name":"runner-1"},"state":"ACTOR_STATE_RUNNING","workerIP":"10.244.0.45","workerSPIFFEID":"spiffe://cluster.local/ns/highway/sa/ateworker","trace_id":"c8be859e406a33a990fdaa070adb921f","span_id":"eaecccedf144e79d","trace_flags":"00"}
+{"time":"2026-11-22T19:35:29.963974014Z","level":"INFO","msg":"Route ok","actor":{"type":"*ateapi.Actor","atespace":"highway","name":"runner-1"},"targetAddr":"10.244.0.45:443","trace_id":"c8be859e406a33a990fdaa070adb921f","span_id":"eaecccedf144e79d","trace_flags":"00"}
+
+[1;36m==> actor, template, workers[0m
+Warning: no --token-file given; acting as the shared identity system:serviceaccount:ate-system:ate-client rather than as yourself. Pass --token-file to act as yourself.
+ATESPACE   NAME       TEMPLATE                 STATE                 WORKER POD                                WORKER IPS    VERSION   AGE
+highway    runner-1   highway/sandbox-runner   ACTOR_STATE_RUNNING   highway/highway-runner-7d57b4b78b-wkgmm   10.244.0.45   3         39s
+Warning: no --token-file given; acting as the shared identity system:serviceaccount:ate-system:ate-client rather than as yourself. Pass --token-file to act as yourself.
+NAME                                   POOL             STATE                 ACTORS   CPU(MILLICORES)   MEMORY        POD                                       AGE
+22347391-e6f2-4c11-8147-cc470f933a29   highway-runner   WORKER_STATE_ACTIVE   0/1000   0/1000            0/960Mi       highway/highway-runner-7d57b4b78b-sg8gj   8m33s
+ca87d963-fe75-4c54-84ba-5a492d6c8d69   highway-runner   WORKER_STATE_ACTIVE   1/1000   500/1000          512Mi/960Mi   highway/highway-runner-7d57b4b78b-wkgmm   8m35s
+NAME                              READY   STATUS    RESTARTS   AGE     IP            NODE                 NOMINATED NODE   READINESS GATES
+highway-runner-7d57b4b78b-sg8gj   1/1     Running   0          8m33s   10.244.0.46   kind-control-plane   <none>           <none>
+highway-runner-7d57b4b78b-wkgmm   1/1     Running   0          8m36s   10.244.0.45   kind-control-plane   <none>           <none>
+Warning: no --token-file given; acting as the shared identity system:serviceaccount:ate-system:ate-client rather than as yourself. Pass --token-file to act as yourself.
+{"time":"2026-11-22T19:35:03.56942434Z","message":"Actor restoring","span_id":"7ca837796e394995","trace_flags":"00","trace_id":"fd404359fadb407d6597ef3a60082960"}
+{"time":"2026-11-22T19:35:03.687449732Z","message":"Actor restored","span_id":"7ca837796e394995","trace_flags":"00","trace_id":"fd404359fadb407d6597ef3a60082960"}
+Warning: no --token-file given; acting as the shared identity system:serviceaccount:ate-system:ate-client rather than as yourself. Pass --token-file to act as yourself.
+metadata:
+  atespace: highway
+  createTime: "2026-11-22T19:35:16.651455191Z"
+  name: default
+  uid: 8d87183c-a406-4270-97bc-2a383436638c
+  updateTime: "2026-11-22T19:35:16.651455191Z"
+  version: "1"
+rules:
+- http:
+    effects:
+      replaceHeaders:
+      - actorJwt:
+          audiences:
+          - store-gate
+          expirationSeconds: "300"
+        header: Authorization
+        prefix: 'Bearer '
+    hostnames:
+    - store-gate.migration.svc.cluster.local
+    ports:
+      numbers:
+      - 8080
+
+[1;36m==> proxy log[0m
+Proxying 127.0.0.1:18000 -> highway/runner-1:80
+
+[1;36m==> highway pods[0m
+NAME                          READY   STATUS    RESTARTS   AGE
+mcp-tools-6cb6f4b47f-rv6ww    1/1     Running   0          67s
+store-gate-6594f4744c-t8k2w   2/2     Running   0          67s
+sts-775954c85b-fknk6          1/1     Running   0          67s
+
+[1;36m==> node[0m
+               total        used        free      shared  buff/cache   available
+Mem:            7923        2726         260          86        5227        5196
+Swap:              0           0           0
+/dev/vda1        38G   21G   18G  55% /

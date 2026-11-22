@@ -1,0 +1,10 @@
+
+[1;36m==> BREAK: grant the store credential (replaceHeaders + credentialUri). The poisoned cleanup script runs[0m
+buckets: ['customer-data', 'billing-exports', 'prod-archive']
+Warning: no --token-file given; acting as the shared identity system:serviceaccount:ate-system:ate-client rather than as yourself. Pass --token-file to act as yourself.
+ATESPACE   ACTOR      RULES   VERSION   AGE
+highway    runner-1   1       1         0s
+list=200 ["customer-data","billing-exports","prod-archive"]
+delete=200 {"deleted":"prod-archive"}
+buckets: ['customer-data', 'billing-exports']
+The actor never held the token; Substrate's egress gateway added it. Nothing asked on whose behalf.

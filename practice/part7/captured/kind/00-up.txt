@@ -1,0 +1,46 @@
+
+[1;36m==> Agent Substrate main on kind (Substrate's own dev path)[0m
+Substrate is already running on this cluster; skipping the install (PART7_REINSTALL=1 to redo it)
+
+[1;36m==> The highway image, the store, the lab STS and store-gate[0m
+Image: "highway-agent:dev" with ID "sha256:627306fc03b426a2ee5ac66c06b9301e28ea0ef6b8ebad10f810e19b5d9b5a4a" not yet present on node "kind-control-plane", loading...
+
+[1;36m==> Grant the highway atespace the store-token Secret (provider default-deny; read at startup)[0m
+configmap/k8s-credential-provider-namespace-policy patched (no change)
+
+[1;36m==> The runner as an actor: atespace, worker pool (gVisor), template, actor[0m
+actor image: localhost:5001/highway-agent@sha256:627306fc03b426a2ee5ac66c06b9301e28ea0ef6b8ebad10f810e19b5d9b5a4a
+2026/11/22 21:34:28 Using base gcr.io/distroless/static-debian13:nonroot@sha256:18f4cc26c9ffa7f20a359298be7deadac5c607c8e03a02b8119f1a5fc2f82c99 for go.ate.dev/substrate/cmd/ateworker-gvisor
+2026/11/22 21:34:29 Building go.ate.dev/substrate/cmd/ateworker-gvisor for linux/arm64/v8
+2026/11/22 21:34:34 Publishing localhost:5001/ateworker-gvisor-6ba39372e3cc3b4b39febbff4256f962:latest
+2026/11/22 21:34:34 existing manifest: sha256-24090082a34c0509afe8fbb9ca7d787276117616d389d514c6ee833bef7d606a.sbom@sha256:8a010a54fcfcf0c4986a93dbb9cf339be4a082d9fac6b5a6d0ea66e539649a88
+2026/11/22 21:34:34 Published SBOM localhost:5001/ateworker-gvisor-6ba39372e3cc3b4b39febbff4256f962:sha256-24090082a34c0509afe8fbb9ca7d787276117616d389d514c6ee833bef7d606a.sbom
+2026/11/22 21:34:34 existing manifest: latest@sha256:24090082a34c0509afe8fbb9ca7d787276117616d389d514c6ee833bef7d606a
+2026/11/22 21:34:34 Published localhost:5001/ateworker-gvisor-6ba39372e3cc3b4b39febbff4256f962@sha256:24090082a34c0509afe8fbb9ca7d787276117616d389d514c6ee833bef7d606a
+workerpool.ate.dev/highway-runner unchanged
+Warning: no --token-file given; acting as the shared identity system:serviceaccount:ate-system:ate-client rather than as yourself. Pass --token-file to act as yourself.
+runner image changed; recreating the template and runner-1
+Warning: no --token-file given; acting as the shared identity system:serviceaccount:ate-system:ate-client rather than as yourself. Pass --token-file to act as yourself.
+actor "runner-1" deleted
+Warning: no --token-file given; acting as the shared identity system:serviceaccount:ate-system:ate-client rather than as yourself. Pass --token-file to act as yourself.
+actor template "sandbox-runner" deleted
+Warning: no --token-file given; acting as the shared identity system:serviceaccount:ate-system:ate-client rather than as yourself. Pass --token-file to act as yourself.
+ATESPACE   NAME             GOLDEN TAG   ERROR   AGE
+highway    sandbox-runner                        0s
+
+[1;36m==> Waiting for the template's golden snapshot (first boot of the runner under gVisor)[0m
+status:
+  goldenSnapshotStatus:
+    goldenTag:
+      atespace: highway
+      name: 15b967e9-626b-4af3-9093-e908006d763e
+    snapshotTime: "2026-11-22T19:34:48.440018769Z"
+workerSelector:
+  matchLabels:
+    workload: highway-runner
+Warning: no --token-file given; acting as the shared identity system:serviceaccount:ate-system:ate-client rather than as yourself. Pass --token-file to act as yourself.
+ATESPACE   NAME       TEMPLATE                 STATE                   WORKER POD   WORKER IPS   VERSION   AGE
+highway    runner-1   highway/sandbox-runner   ACTOR_STATE_SUSPENDED   <none>                    1         0s
+Warning: no --token-file given; acting as the shared identity system:serviceaccount:ate-system:ate-client rather than as yourself. Pass --token-file to act as yourself.
+ATESPACE   NAME       TEMPLATE                 STATE                   WORKER POD   WORKER IPS   VERSION   AGE
+highway    runner-1   highway/sandbox-runner   ACTOR_STATE_SUSPENDED   <none>                    1         0s

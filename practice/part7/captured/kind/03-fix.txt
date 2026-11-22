@@ -1,0 +1,26 @@
+
+[1;36m==> FIX: the actor may reach only store-gate; Substrate injects the actor's JWT, not the store token[0m
+Warning: no --token-file given; acting as the shared identity system:serviceaccount:ate-system:ate-client rather than as yourself. Pass --token-file to act as yourself.
+ATESPACE   ACTOR      RULES   VERSION   AGE
+highway    runner-1   1       1         0s
+
+[1;36m==> tester's permit (no buckets:delete)[0m
+list=200 ["customer-data","billing-exports","prod-archive"]
+delete=403 {"error":"prod-archive is under retention lock; scope buckets:delete not in permit"}
+
+[1;36m==> ops-admin's permit (holds buckets:delete): the retention lock still holds[0m
+list=200 ["customer-data","billing-exports","prod-archive"]
+delete=403 {"error":"prod-archive is under retention lock"}
+
+[1;36m==> no permit[0m
+list=403 {"error":"no permit (x-highway-permit)"}
+delete=403 {"error":"no permit (x-highway-permit); prod-archive is under retention lock"}
+buckets: ['customer-data', 'billing-exports', 'prod-archive']
+
+[1;36m==> store-gate's decisions (caller = the actor identity Substrate vouched for)[0m
+19:35:28 egress=INJECT method=GET host=mcp-tools.migration.svc.cluster.local:8000 path=/store/v1/buckets caller=actor/highway/runner-1 credential=store-token sub=tester act='executor-agent via planner-agent' task_id=72
+19:35:28 egress=DENY method=DELETE host=mcp-tools.migration.svc.cluster.local:8000 path=/store/v1/buckets/prod-archive caller=actor/highway/runner-1 sub=tester act='executor-agent via planner-agent' task_id=72 reason='prod-archive is under retention lock; scope buckets:delete not in permit'
+19:35:29 egress=INJECT method=GET host=mcp-tools.migration.svc.cluster.local:8000 path=/store/v1/buckets caller=actor/highway/runner-1 credential=store-token sub=ops-admin act='executor-agent via planner-agent' task_id=72
+19:35:29 egress=DENY method=DELETE host=mcp-tools.migration.svc.cluster.local:8000 path=/store/v1/buckets/prod-archive caller=actor/highway/runner-1 sub=ops-admin act='executor-agent via planner-agent' task_id=72 reason='prod-archive is under retention lock'
+19:35:29 egress=DENY method=GET host=mcp-tools.migration.svc.cluster.local:8000 path=/store/v1/buckets caller=actor/highway/runner-1 sub=- act=- task_id=- reason='no permit (x-highway-permit)'
+19:35:29 egress=DENY method=DELETE host=mcp-tools.migration.svc.cluster.local:8000 path=/store/v1/buckets/prod-archive caller=actor/highway/runner-1 sub=- act=- task_id=- reason='no permit (x-highway-permit); prod-archive is under retention lock'
