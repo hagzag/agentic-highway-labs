@@ -4,6 +4,10 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 export PART7_IN_VM=1
 export SUBSTRATE_DIR="${SUBSTRATE_DIR:-$HOME/substrate}"   # build on the VM's disk, not the mount
+# Some hosts (index.crates.io) are unreachable from Docker's bridge network in a Lima VM on a
+# managed Mac, while the VM itself reaches them. Substrate's ate-setup reads DOCKER_BUILD_FLAGS
+# for the images it builds with docker (the Envoy dataplane runs cargo), so build on the host network.
+export DOCKER_BUILD_FLAGS="${DOCKER_BUILD_FLAGS:---network=host}"
 export PATH="/usr/local/go/bin:$HOME/go/bin:$PATH"
 
 # Outbound network check. Lima's user-mode network may hand out IPv6 answers it can't route:
