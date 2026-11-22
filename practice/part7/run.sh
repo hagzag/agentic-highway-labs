@@ -8,7 +8,7 @@
 # provider, and Substrate's egress gateway injects it. Then the fix: Substrate injects
 # the actor's JWT instead, and store-gate (Part 6's gateway) checks the permit.
 #
-# NOT YET RUN END TO END (written 2026-11-21 from Substrate's docs). Needs Linux:
+# Captured end to end on 2026-11-22 (macOS -> Lima -> kind). Needs Linux:
 # Substrate requires gVisor or a microVM, so on macOS this script creates a Lima Linux VM
 # (lima.yaml) and re-runs itself there via vm-exec.sh.
 source "$(dirname "$0")/../../scripts/lib.sh"

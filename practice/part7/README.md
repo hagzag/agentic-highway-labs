@@ -2,7 +2,7 @@
 
 Part 6 tested the pattern with a stand-in egress gateway. Part 7 runs the same break and fix against [Agent Substrate](https://github.com/agent-substrate/substrate), the CNCF Sandbox project that ships "zero credentials in the sandbox" as a default.
 
-> **Status: not yet run end to end.** Written on 2026-11-21 from Substrate's docs (pre-1.0, no published release). The first run will probably need fixes. The marked open questions are where. Capture with `task part7:capture` and replace this note with what actually happened.
+> **Status: captured 2026-11-22** on macOS (Apple Silicon) through the Lima VM, kind, and Agent Substrate built from `main`. The output is in [`captured/kind/`](captured/kind/). `doctor.txt` holds the cluster state after the run.
 
 ## What runs
 
@@ -22,16 +22,31 @@ task part7:fix      # actorJwt + store-gate: tester DENIED, ops-admin DENIED (re
 task part7:down     # delete the kind cluster
 ```
 
-### Expected (not yet captured)
+### Captured (2026-11-22, [`captured/kind/`](captured/kind/))
 
 ```text
-==> BREAK
+==> PAVED: no EgressPolicy yet. Part 4's exfil from inside a gVisor actor
+env_store_token=False
+read_token=FileNotFoundError
+exfil=ConnectError
+
+==> BREAK: grant the store credential (replaceHeaders + credentialUri)
 list=200 ["customer-data","billing-exports","prod-archive"]
 delete=200 {"deleted":"prod-archive"}
-==> FIX (tester's permit)
+buckets: ['customer-data', 'billing-exports']
+
+==> FIX: tester's permit (no buckets:delete)
 delete=403 {"error":"prod-archive is under retention lock; scope buckets:delete not in permit"}
-egress=DENY ... caller=actor/highway/runner-1 sub=tester ...
+==> ops-admin's permit (holds buckets:delete)
+delete=403 {"error":"prod-archive is under retention lock"}
+==> no permit
+list=403 {"error":"no permit (x-highway-permit)"}
+delete=403 {"error":"no permit (x-highway-permit); prod-archive is under retention lock"}
+
+egress=DENY method=DELETE host=mcp-tools.migration.svc.cluster.local:8000 path=/store/v1/buckets/prod-archive caller=actor/highway/runner-1 sub=tester ...
 ```
+
+The actor never holds the store token, in the break or in the fix. In the break, Substrate's egress gateway adds it to any request for the store. In the fix, store-gate adds it, and only after checking the permit. `caller=actor/highway/runner-1` is the `sub` of the actor JWT that Substrate injected and store-gate verified against Substrate's IdP.
 
 ## Prerequisites
 
@@ -40,14 +55,24 @@ egress=DENY ... caller=actor/highway/runner-1 sub=tester ...
 - **On Linux:** Docker, kind, kubectl, Go (Substrate installs with `go run ./cmd/ate-setup`), and Python 3 with `src/requirements.txt` for `call.py`.
 - A recent Kubernetes. Substrate needs the PodCertificateRequest and ClusterTrustBundle APIs; its kind script sets that up.
 
-## Open questions for the first run
+## What the first run answered
 
-1. **Actor image.** Can a gVisor worker pull `highway-agent:dev` after `kind load`, or does it need a registry and a digest (Substrate's example uses `@sha256:`)?
-2. **Router to actor.** Does `atenet-router` pass `x-highway-permit` through to the actor, and does the MCP streamable-HTTP session survive actor suspend/resume?
-3. **IdP URL.** `run.sh` guesses the JWKS URL from the `ate-system` Service whose name contains `idp`. Set `ACTOR_JWKS_URL` if that's wrong. The JWT `sub` is documented as `actor/<atespace>/<actor-name>`.
-4. **Plain HTTP.** The EgressPolicies use `http` rules (no TLS MITM). Substrate decides cleartext on `Host`, method and headers, so `replaceHeaders` should apply, but that's unconfirmed.
-5. **gVisor in a Lima VM.** On Apple Silicon there's no nested KVM, so gVisor has to use its `systrap` platform inside kind's nodes. Whether Substrate's kind script sets that up is unconfirmed.
-6. **`ext_proc`.** The cleaner fix puts the permit check *in* Substrate's egress path via `--experimental-additional-egress-extproc-service`. Its message contract isn't documented yet, so this part uses `store-gate` behind `actorJwt` instead.
+1. **Actor image.** A gVisor worker can't use a `kind load`ed image. `run.sh` pushes the image to the kind registry (`localhost:5001`) and pins the actor template to its `@sha256:` digest. When the digest changes, it recreates the template and the actor.
+2. **Router to actor.** The router requires a client certificate, so a plain port-forward can't reach it. `kubectl ate proxy actor` mints the certificate. Headers such as `x-highway-permit` and `x-highway-sub` pass through, and the MCP session survives the actor's suspend and resume. `run.sh` starts a fresh proxy for each run, because a proxy left from an earlier run keeps a stale view of the router.
+3. **IdP URL.** It's `https://idp.ate-system.svc/openid/v1/jwks`. The serving cert comes from the `servicedns.podcert.ate.dev` signer, so store-gate trusts that signer's ClusterTrustBundle (configmap `idp-ca`). The JWT `sub` is `actor/highway/runner-1`.
+4. **Plain HTTP.** `replaceHeaders` works on cleartext `http` rules: the break's `credentialUri` and the fix's `actorJwt` both apply without TLS interception.
+5. **gVisor in a Lima VM.** It works. The VM has no `/dev/kvm`, and the gVisor workers run on the `systrap` platform.
+6. **`ext_proc`.** Still open. The message contract for `--experimental-additional-egress-extproc-service` isn't documented, so the permit check stays in store-gate behind `actorJwt`.
+
+## Running on a managed Mac
+
+These are things the first run hit on a Mac with VPN and endpoint-security software.
+
+- **Network.** `lima.yaml` uses Apple's NAT (`vzNAT`). Lima's default user-mode network can resolve DNS while TCP is refused.
+- **DNS.** The Docker daemon in the VM is pinned to `1.1.1.1` and `8.8.8.8`, and image builds run with `--network=host` (`DOCKER_BUILD_FLAGS`).
+- **Router stuck not Ready.** If the `atenet-router` container restarts on its own, for example after a failed liveness probe while the VM slept, its shutdown drains the Envoy sidecar. Envoy stays in `DRAINING`, `/ready` returns 503, and the pod sits at `1/2`. `run.sh` (`router_ready`) spots this and recreates the router pods. By hand: `kubectl -n ate-system delete pod -l app=atenet-router`.
+- **Policy timing.** An `EgressPolicy` reaches a running actor asynchronously. `run.sh` waits `EGRESS_SETTLE` seconds (default 10) after changing one, and retries a call while every request still fails with `ConnectError`.
+- **Diagnostics.** `task part7:doctor` prints the Substrate pods, router, actor, egress policy, proxy log and node usage. `capture` writes the same to `captured/kind/doctor.txt`, even when a step fails.
 
 ## How to use Agent Substrate
 
