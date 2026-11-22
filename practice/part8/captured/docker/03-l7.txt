@@ -1,0 +1,14 @@
+
+[1;36m==> FIX A (OpenShell-native): L7 rules. GET allowed, DELETE prod-archive denied[0m
+
+Created sandbox: highway
+
+  [0.0s] Requesting compute...
+[0.0s] Sandbox allocated
+[0.0s] Pulling image highway-sandbox:dev
+[0.0s] Image already present
+[0.3s] Starting sandbox Container created
+list=200 ["customer-data","billing-exports","prod-archive"]
+delete=HTTPError 403 {"error":"policy_denied","policy":"_provider_highway_store","rule":"DELETE /store/v1/buckets/prod-archive","detail":"DELETE /store/v1/buckets/prod-archive block
+buckets: ['customer-data', 'billing-exports', 'prod-archive']
+Static: this is the answer for every task and every human in this sandbox, not for this delegation.

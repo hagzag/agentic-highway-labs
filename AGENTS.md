@@ -78,7 +78,9 @@ See detailed findings in `../LAB-FINDINGS.md` and `../part1-verification.md`.
 - ✅ `opa test practice/part6/policy`: 6/6
 - Local runs have no mesh, so the local policy data adds caller `-`; on k3d the caller is Linkerd's `l5d-client-id`.
 
-**Parts 7 (Agent Substrate) and 8 (OpenShell)** are written from the projects' docs (2026-11-21) and **not yet run**. Their READMEs list the open questions (actor image pull, router headers, IdP URL; OpenShell profile field names). Pin `SUBSTRATE_REF` to a commit once Part 7 passes.
+**Part 7 (Agent Substrate)** captured 2026-11-22 on macOS → Lima VM → kind (`practice/part7/captured/kind/`): paved finds no token and no route; break deletes prod-archive (`credentialUri`); fix (`actorJwt` → store-gate) DENIES tester, ops-admin and no-permit, with `caller=actor/highway/runner-1`. Pin `SUBSTRATE_REF` to a commit when the post ships.
+
+**Part 8 (OpenShell 0.1.9)** captured 2026-11-22 on macOS + Docker Desktop (`practice/part8/captured/docker/`): placeholder in env, no route out; break deletes prod-archive through the provider; L7 `deny_rules` block the delete; the prover reports `exceeds_boundary` for both candidates; store-gate DENIES tester and ops-admin (caller `-`).
 
 ## Commits
 Conventional Commits (`feat(part2): ...`, `fix(lib): ...`). Tag each part when its post ships: `part1`, `part2`, ...

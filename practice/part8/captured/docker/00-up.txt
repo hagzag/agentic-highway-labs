@@ -1,0 +1,13 @@
+openshell 0.1.9
+
+[1;36m==> The highway image, the store (with its REST API), the lab STS, store-gate + OPA[0m
+sha256:8a5c12b28868c6b5527925463b40d3d03fde46d2f1d2b0baf87cc44fa777b958
+sha256:be622f4ecbcbcf73baa293663497a5316867cc910a7e392e775ee50d5dd97ac5
+buckets: ['customer-data', 'billing-exports', 'prod-archive']
+
+[1;36m==> Provider: the store token, usable only at host.openshell.internal:8000[0m
+Provider profile lint passed.
+Imported 1 provider profile.
+✓ Created provider highway-store
+NAME           TYPE           CREDENTIAL_KEYS   CONFIG_KEYS
+highway-store  highway-store  1                 0

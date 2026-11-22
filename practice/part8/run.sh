@@ -7,37 +7,71 @@
 # sees a placeholder, the proxy adds the real value at an approved endpoint.
 # Runs on Docker (Linux or macOS on Apple Silicon): no cluster.
 #
-# NOT YET RUN END TO END (written 2026-11-21 from OpenShell's docs, v0.1.9). The provider
-# profile's field names are assumed: see policy/profile-store.yaml.
+# Captured end to end on 2026-11-22 (macOS, Docker Desktop, OpenShell 0.1.9 from Homebrew).
 source "$(dirname "$0")/../../scripts/lib.sh"
 HERE="$(cd "$(dirname "$0")" && pwd)"
 OUT="$HERE/captured/docker"
 SBX=highway
 NET=highway-part8
 TOKEN_FILE="$HERE/.store-token"
+SBX_IMAGE=highway-sandbox:dev   # the highway image plus a non-root user: the sandbox identity needs a usable WORKDIR
 dk() { docker run -d --network "$NET" --restart=no "$@" >/dev/null; }
 state() { curl -s localhost:8000/admin/state | python3 -c 'import json,sys; print("buckets:", [b["name"] for b in json.load(sys.stdin)["buckets"]])'; }
 reset() { curl -s -X POST localhost:8000/admin/reset >/dev/null; }
 permit() { curl -s "localhost:8099/mint?scope=${1// /+}&sub=${2:-tester}"; }
+sandbox_rm() {  # delete the sandbox and wait: deletion is asynchronous, and the name (and any
+  # provider attached to it) stays taken until cleanup finishes
+  openshell sandbox delete "$SBX" >/dev/null 2>&1 || true
+  for _ in $(seq 60); do openshell sandbox get "$SBX" >/dev/null 2>&1 || return 0; sleep 1; done
+  echo "sandbox $SBX still present after 60s" >&2; return 1
+}
 sandbox() {  # sandbox <policy-file> [--provider X]: (re)create the sandbox with this policy
-  openshell sandbox delete --name "$SBX" >/dev/null 2>&1 || true
-  openshell sandbox create --name "$SBX" --from "$IMAGE" --policy "$HERE/policy/$1" "${@:2}" -- sleep infinity
+  sandbox_rm
+  openshell sandbox create --name "$SBX" --from "$SBX_IMAGE" --policy "$HERE/policy/$1" "${@:2}" --detach -- sleep infinity
 }
 run_py() {  # run_py <script> [args...]: run a script inside the sandbox
   openshell sandbox exec --name "$SBX" -- python -c "$(cat "$HERE/scripts/$1")" "${@:2}"
 }
 
+GW="$HERE/.gateway"
+gateway_up() {  # a local OpenShell gateway (mTLS, docker driver), unless one is already connected
+  # NVIDIA's install.sh runs this as a service; Homebrew's core formula installs only the
+  # binaries. Same shape here: mTLS for the CLI, gateway-minted JWTs for the sandboxes.
+  openshell status 2>/dev/null | grep -q 'Status: Connected' && return
+  command -v openshell-gateway >/dev/null || { echo "missing: openshell-gateway"; exit 1; }
+  say "Starting a local OpenShell gateway (127.0.0.1:17670, docker driver; state in $GW)"
+  mkdir -p "$GW"
+  # PKI: server cert, CA, the CLI's client cert (also written to ~/.config/openshell), JWT keys
+  [[ -s "$GW/pki/jwt/kid" ]] || openshell-gateway generate-certs --output-dir "$GW/pki" >/dev/null
+  # Sandboxes sit on Docker's bridge. On Docker Desktop, host.docker.internal reaches the
+  # loopback-bound gateway, and it's in the server cert's SANs.
+  printf '[openshell]\nversion = 2\n\n[openshell.gateway]\nguest_tls_ca = "%s"\n\n[openshell.drivers.docker]\ngrpc_endpoint = "https://%s:17670"\n' \
+    "$GW/pki/ca.crt" "${OPENSHELL_GUEST_HOST:-host.docker.internal}" > "$GW/gateway.toml"
+  OPENSHELL_LOCAL_TLS_DIR="$GW/pki" OPENSHELL_TELEMETRY_ENABLED=false nohup openshell-gateway \
+    --config "$GW/gateway.toml" --compute-driver docker --db-url "sqlite://$GW/gateway.db?mode=rwc" \
+    > "$GW/gateway.log" 2>&1 &
+  echo $! > "$GW/gateway.pid"
+  openshell gateway add https://127.0.0.1:17670 --local --name openshell >/dev/null 2>&1 || true
+  openshell gateway select openshell >/dev/null 2>&1 || true
+  for _ in $(seq 30); do openshell status 2>/dev/null | grep -q 'Status: Connected' && return; sleep 1; done
+  echo "gateway did not come up:" >&2; tail -20 "$GW/gateway.log" >&2; exit 1
+}
+
 up() {
   need docker curl python3
   if ! command -v openshell >/dev/null; then
-    say "Installing the OpenShell CLI"
-    curl -LsSf https://raw.githubusercontent.com/NVIDIA/OpenShell/main/install.sh | sh
+    say "Installing OpenShell (CLI, gateway, prover)"
+    if command -v brew >/dev/null; then brew install openshell
+    else curl -LsSf https://raw.githubusercontent.com/NVIDIA/OpenShell/main/install.sh | sh; fi
   fi
   openshell --version
   command -v openshell-prover >/dev/null || echo "note: openshell-prover not installed; 'prove' will be skipped (brew/apt/rpm/snap)"
+  gateway_up
 
   say "The highway image, the store (with its REST API), the lab STS, store-gate + OPA"
   docker build -q -t "$IMAGE" "$REPO_ROOT/src"
+  printf 'FROM %s\nRUN useradd -m -u 1000 -s /bin/bash sandbox && mkdir -p /sandbox && chown sandbox:sandbox /sandbox\nUSER sandbox\nWORKDIR /sandbox\n' "$IMAGE" \
+    | docker build -q -t "$SBX_IMAGE" -
   docker network create "$NET" >/dev/null 2>&1 || true
   [[ -s "$TOKEN_FILE" ]] || openssl rand -hex 12 | sed 's/^/store-/' > "$TOKEN_FILE"
   docker rm -f highway-store highway-sts highway-gate highway-opa >/dev/null 2>&1 || true
@@ -60,9 +94,13 @@ EOF
   state
 
   say "Provider: the store token, usable only at host.openshell.internal:8000"
-  openshell profile lint -f "$HERE/policy/profile-store.yaml"
-  openshell profile import -f "$HERE/policy/profile-store.yaml" || true
+  # Re-runnable: lint refuses an id that already exists, so drop the sandbox (it holds the
+  # provider), the provider (it holds the profile) and then the profile
+  sandbox_rm
   openshell provider delete highway-store >/dev/null 2>&1 || true
+  openshell profile delete highway-store >/dev/null 2>&1 || true
+  openshell profile lint -f "$HERE/policy/profile-store.yaml"
+  openshell profile import -f "$HERE/policy/profile-store.yaml"
   openshell provider create --name highway-store --type highway-store --credential STORE_TOKEN="$(cat "$TOKEN_FILE")"
   openshell provider list
 }
@@ -95,7 +133,8 @@ prove() {
   command -v openshell-prover >/dev/null || { echo "openshell-prover not installed; skipping"; return; }
   for c in sandbox-break.yaml sandbox-l7.yaml; do
     echo "--- $c"
-    openshell-prover check "$HERE/policy/$c" --boundary "$HERE/policy/boundary.yaml" || true
+    # The L7 candidate takes ~50s on an M-series Mac; the default 10s budget ends "inconclusive"
+    openshell-prover check "$HERE/policy/$c" --boundary "$HERE/policy/boundary.yaml" --timeout "${PROVER_TIMEOUT:-2m}" || true
   done
 }
 
@@ -124,9 +163,10 @@ capture() {
 }
 
 down() {
-  openshell sandbox delete --name "$SBX" >/dev/null 2>&1 || true
+  openshell sandbox delete "$SBX" >/dev/null 2>&1 || true
   docker rm -f highway-store highway-sts highway-gate highway-opa >/dev/null 2>&1 || true
   docker network rm "$NET" >/dev/null 2>&1 || true
+  [[ -s "$GW/gateway.pid" ]] && kill "$(cat "$GW/gateway.pid")" 2>/dev/null; rm -f "$GW/gateway.pid"
 }
 
 case "${1:-all}" in

@@ -1,0 +1,10 @@
+
+[1;36m==> The prover, as a CI gate: does a candidate policy stay inside the platform boundary?[0m
+--- sandbox-break.yaml
+result: exceeds_boundary
+coverage: domains=filesystem,network_l4,network_rest,process,landlock
+counterexample: network binary=- ancestor_binary=- binary_identity_required=false host=host.openshell.internal:8000 destination_ip=0.0.0.64 trusted_gateway=false protocol=rest method=B path=/
+--- sandbox-l7.yaml
+result: exceeds_boundary
+coverage: domains=filesystem,network_l4,network_rest,process,landlock
+counterexample: network binary=- ancestor_binary=- binary_identity_required=false host=host.openshell.internal:8000 destination_ip=0:0:0:1000:: trusted_gateway=false protocol=rest method=DELETE path=/store/v1/buckets/

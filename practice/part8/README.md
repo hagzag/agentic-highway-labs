@@ -2,7 +2,7 @@
 
 Part 7 ran the break on Agent Substrate. Part 8 runs it on [OpenShell](https://github.com/NVIDIA/OpenShell) (NVIDIA, CNCF Sandbox), which puts the fence around the process rather than the pod. A supervisor sees every file access, syscall and connection. Credentials are **providers**: the agent's environment holds a placeholder (`openshell:resolve:env:STORE_TOKEN`), and the proxy swaps in the real value only at an approved endpoint.
 
-> **Status: not yet run end to end.** Written on 2026-11-21 from OpenShell's docs (v0.1.9). The provider profile's field names are assumed. Check them against `openshell profile export openai -o yaml` before the first run. Capture with `task part8:capture`.
+> **Status: captured 2026-11-22** on macOS (Apple Silicon, Docker Desktop) with OpenShell 0.1.9 from Homebrew. The output is in [`captured/docker/`](captured/docker/).
 
 It runs on Docker, including your Mac, with no cluster.
 
@@ -15,6 +15,45 @@ task part8:prove   # openshell-prover: both candidates exceed a read-only bounda
 task part8:gate    # fix B: the sandbox reaches only store-gate, which checks the permit
 task part8:down
 ```
+
+### Captured (2026-11-22, [`captured/docker/`](captured/docker/))
+
+```text
+==> PAVED (store provider attached)
+env STORE_TOKEN=openshell:resolve:env:v16036625205767672614_STORE_TOKEN
+read_token=FileNotFoundError
+exfil=URLError [Errno 13] Permission denied
+
+==> BREAK (full access + provider)
+list=200 ["customer-data","billing-exports","prod-archive"]
+delete=200 {"deleted":"prod-archive"}
+
+==> FIX A (L7 rules)
+list=200 ["customer-data","billing-exports","prod-archive"]
+delete=HTTPError 403 {"error":"policy_denied","policy":"_provider_highway_store","rule":"DELETE /store/v1/buckets/prod-archive",...}
+
+==> prover vs a read-only boundary
+sandbox-break.yaml  result: exceeds_boundary
+sandbox-l7.yaml     result: exceeds_boundary  counterexample: ... method=DELETE path=/store/v1/buckets/
+
+==> FIX B (store-gate)
+tester:    delete=HTTPError 403 {"error":"prod-archive is under retention lock; scope buckets:delete not in permit"}
+ops-admin: delete=HTTPError 403 {"error":"prod-archive is under retention lock"}
+egress=DENY method=DELETE host=highway-store:8000 path=/store/v1/buckets/prod-archive caller=- sub=tester ...
+```
+
+The prover's result for the L7 policy is the point of that step. The policy blocks `prod-archive`, but `DELETE /store/v1/buckets/*` still lets it delete any *other* bucket, so it isn't read-only. A reviewer reading the YAML can miss that. The prover doesn't.
+
+## What the first run changed
+
+- **Install.** Homebrew's core formula (`brew install openshell`) ships the CLI, `openshell-gateway` and `openshell-prover`, but no gateway service. `run.sh` (`gateway_up`) starts a local gateway on `127.0.0.1:17670` and keeps its state in `.gateway/`. It uses mTLS for the CLI (`openshell-gateway generate-certs`), gateway-minted sandbox JWTs (`OPENSHELL_LOCAL_TLS_DIR`), the docker driver, and `grpc_endpoint = https://host.docker.internal:17670` so sandbox supervisors can reach it. NVIDIA's `install.sh` is still the fallback where there's no Homebrew.
+- **Provider profile.** The guessed `location: {header, prefix}` wasn't real. The 0.1.9 schema is `env_vars`, `auth_style: bearer` and `header_name: Authorization`. `profile lint` ignores unknown keys, so a wrong guess still passes lint.
+- **Sandbox image.** The sandbox identity needs a WORKDIR it can use, and the highway image's `/app` is root-owned. `run.sh` builds `highway-sandbox:dev`: the same image plus a uid-1000 `sandbox` user with WORKDIR `/sandbox`. `/app` stays read-only.
+- **CLI details.**
+  - `sandbox delete` takes the name as an argument (`--name` is rejected).
+  - Deletion is asynchronous. A sandbox holds its provider, and a provider holds its profile, so `run.sh` waits for the sandbox to go before replacing either.
+  - `sandbox create` attaches unless you pass `--detach`.
+- **Prover budget.** The L7 candidate needs about 50s of solver time, and at the default 10s it reports `inconclusive (timeout)`. `PROVER_TIMEOUT` defaults to `2m`.
 
 ## Two fixes, and why both are here
 
