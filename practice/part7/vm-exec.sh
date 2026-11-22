@@ -48,5 +48,6 @@ docker buildx version >/dev/null 2>&1 || sudo docker buildx version >/dev/null 2
   echo "==> Installing docker-buildx"; sudo apt-get install -y -qq docker-buildx >/dev/null; }
 
 # A fresh VM login may not have the docker group yet
-if id -nG | grep -qw docker; then exec bash ./practice/part7/run.sh "$@"; fi
-exec sg docker -c "bash ./practice/part7/run.sh $*"
+X=""; [[ -n "${PART7_TRACE:-}" ]] && X="-x"   # PART7_TRACE=1 traces every command
+if id -nG | grep -qw docker; then exec bash $X ./practice/part7/run.sh "$@"; fi
+exec sg docker -c "bash $X ./practice/part7/run.sh $*"

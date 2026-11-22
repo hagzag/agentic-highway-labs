@@ -39,7 +39,7 @@ if [[ "$(uname -s)" == Darwin && -z "${PART7_IN_VM:-}" ]]; then
     vm-down)  limactl delete -f "$VM" ;;
     vm-shell) vm_ensure; limactl shell --workdir "$REPO_ROOT" "$VM" ;;
     *) vm_ensure; say "Running Part 7 '${1:-all}' inside Lima VM $VM"
-       limactl shell --workdir "$REPO_ROOT" "$VM" bash ./practice/part7/vm-exec.sh "${1:-all}" ;;
+       limactl shell --workdir "$REPO_ROOT" "$VM" env PART7_TRACE="${PART7_TRACE:-}" PART7_REINSTALL="${PART7_REINSTALL:-}" bash ./practice/part7/vm-exec.sh "${1:-all}" ;;
   esac
   exit
 fi
@@ -119,8 +119,14 @@ EOF
   # Actor templates must pin images by digest, and the worker pool's ko:// image must be built:
   # push the highway image to the kind registry and let ko resolve the pool (as ate-setup does).
   local reg=localhost:5001 ref
-  docker tag "$IMAGE" "$reg/$IMAGE" && docker push -q "$reg/$IMAGE" >/dev/null
-  ref=$(docker inspect --format '{{index .RepoDigests 0}}' "$reg/$IMAGE" | grep "^$reg/")
+  docker tag "$IMAGE" "$reg/$IMAGE"
+  docker push "$reg/$IMAGE" >/dev/null || { echo "push to the kind registry ($reg) failed" >&2; exit 1; }
+  # Ask the registry for the digest (RepoDigests is empty with Docker's containerd image store)
+  local digest
+  digest=$(curl -fsSI -H 'Accept: application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.list.v2+json, application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.v2+json' \
+    "http://$reg/v2/${IMAGE%%:*}/manifests/${IMAGE##*:}" | tr -d '\r' | awk 'tolower($1)=="docker-content-digest:"{print $2}')
+  [[ -n "$digest" ]] || { echo "could not read the digest of $reg/$IMAGE from the registry" >&2; exit 1; }
+  ref="$reg/${IMAGE%%:*}@$digest"
   echo "actor image: $ref"
   ate get atespace "$ATESPACE" >/dev/null 2>&1 || ate create atespace "$ATESPACE"
   kubectl create ns "$ATESPACE" --dry-run=client -o yaml | kubectl apply -f - >/dev/null
