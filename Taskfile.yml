@@ -8,7 +8,7 @@ vars:
   P4: ./practice/part4/run.sh
   P5: ./practice/part5/run.sh
   P6: ./practice/part6/run.sh
-  P7: ./practice/part7/run.sh
+  P7: bash ./practice/part7/run.sh   # via bash: an edit that drops the +x bit cannot break it
   P8: ./practice/part8/run.sh
 
 tasks:
