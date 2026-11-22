@@ -54,6 +54,8 @@ PERMIT_AUDIENCE = os.environ.get("PERMIT_AUDIENCE", "mcp-gateway")
 CALLER_FROM = os.environ.get("CALLER_FROM", "mesh")
 ACTOR_JWKS_URL = os.environ.get("ACTOR_JWKS_URL", "")
 ACTOR_AUDIENCE = os.environ.get("ACTOR_AUDIENCE", "store-gate")
+# CA for an https JWKS URL (Substrate's IdP serves TLS from its own service-DNS signer).
+ACTOR_JWKS_CA = os.environ.get("ACTOR_JWKS_CA", "")
 
 _sts_keys: KeySet | None = None
 _actor_keys: KeySet | None = None
@@ -67,7 +69,7 @@ def _actor(request: Request) -> str:
         return "-"
     try:
         if _actor_keys is None:
-            _actor_keys = KeySet.import_key_set(httpx.get(ACTOR_JWKS_URL, timeout=5).json())
+            _actor_keys = KeySet.import_key_set(httpx.get(ACTOR_JWKS_URL, timeout=5, verify=ACTOR_JWKS_CA or True).json())
         claims = jwt.decode(auth[7:], _actor_keys, algorithms=["ES256", "RS256"]).claims
         jwt.JWTClaimsRegistry(aud={"essential": True, "value": ACTOR_AUDIENCE},
                               exp={"essential": True}).validate(claims)

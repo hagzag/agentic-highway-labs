@@ -73,12 +73,15 @@ spec:
             - {name: CALLER_FROM, value: actor-jwt}
             - {name: ACTOR_JWKS_URL, value: "ACTOR_JWKS_URL"}
             - {name: ACTOR_AUDIENCE, value: store-gate}
+            - {name: ACTOR_JWKS_CA, value: /run/idp-ca/ca.pem}
             - {name: STS_URL, value: "http://sts:8080"}
             - {name: STS_ISSUER, value: "http://sts.migration.svc.cluster.local:8080"}
             - {name: EGRESS_CRED_DIR, value: /var/run/egress}
             - name: EGRESS_POLICY
               value: '{"mcp-tools.migration.svc.cluster.local:8000": {"prefix": "/store/", "credential": "store-token", "header": "Authorization", "value_prefix": "Bearer "}}'
-          volumeMounts: [{name: creds, mountPath: /var/run/egress, readOnly: true}]
+          volumeMounts:
+            - {name: creds, mountPath: /var/run/egress, readOnly: true}
+            - {name: idp-ca, mountPath: /run/idp-ca, readOnly: true}
         - name: opa
           image: openpolicyagent/opa:OPA_VERSION
           args: ["run", "--server", "--addr=127.0.0.1:8181", "--disable-telemetry",
@@ -89,6 +92,8 @@ spec:
           secret: {secretName: store-token, items: [{key: token, path: store-token}]}
         - name: policy
           configMap: {name: egress-policy}
+        - name: idp-ca   # Substrate's service-DNS CA, copied from its ClusterTrustBundle by run.sh
+          configMap: {name: idp-ca, optional: true}
 ---
 apiVersion: v1
 kind: Service

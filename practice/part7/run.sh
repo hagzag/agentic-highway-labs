@@ -70,11 +70,15 @@ egress_policy() {  # egress_policy <file|none>: replace the actor's EgressPolicy
   ate delete egress-policy "$ACTOR" -a "$ATESPACE" >/dev/null 2>&1 || true
   [[ "$1" == none ]] || ate create egress-policy "$ACTOR" -a "$ATESPACE" -f "$HERE/manifests/$1"
 }
-actor_jwks() {  # Substrate's IdP (cmd/ate-idp-server) serves OIDC discovery + keys; find its Service
-  local svc port
-  svc=$(kubectl -n ate-system get svc -o name | grep -m1 idp | cut -d/ -f2 || true)
-  port=$(kubectl -n ate-system get svc "$svc" -o jsonpath='{.spec.ports[0].port}' 2>/dev/null || true)
-  echo "${ACTOR_JWKS_URL:-http://$svc.ate-system.svc.cluster.local:$port/.well-known/jwks.json}"
+actor_jwks() {  # Substrate's IdP (cmd/ate-idp-server): Service "idp" (443/TLS), JWKS at /openid/v1/jwks
+  echo "${ACTOR_JWKS_URL:-https://idp.ate-system.svc/openid/v1/jwks}"
+}
+idp_ca() {  # the IdP's serving cert comes from the servicedns.podcert.ate.dev signer; trust its ClusterTrustBundle
+  kubectl get clustertrustbundles -o json | python3 -c 'import json,sys
+print("".join(b["spec"]["trustBundle"] for b in json.load(sys.stdin)["items"]
+              if b["spec"].get("signerName", "").startswith("servicedns.podcert.ate.dev/")))' > "$HERE/.idp-ca.pem"
+  [[ -s "$HERE/.idp-ca.pem" ]] || echo "warning: no servicedns.podcert.ate.dev ClusterTrustBundle; store-gate can't verify actor JWTs" >&2
+  k create configmap idp-ca --from-file=ca.pem="$HERE/.idp-ca.pem" --dry-run=client -o yaml | kubectl apply -f - >/dev/null
 }
 
 up() {
@@ -109,6 +113,8 @@ EOF
     --from-file=data.json="$HERE/.data.json" --dry-run=client -o yaml | kubectl apply -f - >/dev/null
   sed -e "s|IMAGE|$IMAGE|" -e "s|OPA_VERSION|$OPA_VERSION|" -e "s|\"ACTOR_JWKS_URL\"|\"$(actor_jwks)\"|" \
     "$HERE/manifests/10-highway.yaml" | kubectl apply -f - >/dev/null
+  idp_ca
+  k rollout restart deploy >/dev/null   # pick up a rebuilt image (same tag) and the IdP CA
   k rollout status deploy --timeout=180s >/dev/null
 
   say "Grant the highway atespace the store-token Secret (provider default-deny; read at startup)"
