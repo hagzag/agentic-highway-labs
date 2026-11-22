@@ -11,6 +11,19 @@ export SUBSTRATE_DIR="${SUBSTRATE_DIR:-$HOME/substrate}"   # build on the VM's d
 export DOCKER_BUILD_FLAGS="${DOCKER_BUILD_FLAGS:---network=host}"
 export PATH="/usr/local/go/bin:$HOME/go/bin:$PATH"
 
+# DNS: on a managed Mac the VM's own resolvers (Lima's 192.168.5.x and the vzNAT gateway) can
+# time out while public resolvers answer. Pin the VM and Docker (builds, containers, kind nodes)
+# to 1.1.1.1 / 8.8.8.8. Override with PART7_DNS="a b".
+DNS="${PART7_DNS:-1.1.1.1 8.8.8.8}"
+if ! grep -qs "DNS=$DNS" /etc/systemd/resolved.conf.d/10-part7.conf; then
+  echo "==> Pinning DNS to $DNS in the VM and Docker"
+  sudo mkdir -p /etc/systemd/resolved.conf.d /etc/docker
+  printf '[Resolve]\nDNS=%s\nDomains=~.\n' "$DNS" | sudo tee /etc/systemd/resolved.conf.d/10-part7.conf >/dev/null
+  sudo systemctl restart systemd-resolved
+  python3 -c 'import json,sys; print(json.dumps({"dns": sys.argv[1:]}))' $DNS | sudo tee /etc/docker/daemon.json >/dev/null
+  sudo systemctl restart docker
+fi
+
 # Outbound network check. Lima's user-mode network may hand out IPv6 answers it can't route:
 # if IPv4 works and the default doesn't, prefer IPv4 for good.
 net() { curl -fsS -o /dev/null -m 10 "$@" https://pypi.org/simple/pip/; }   # small page, not the full index
