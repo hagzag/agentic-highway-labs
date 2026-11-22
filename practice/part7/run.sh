@@ -89,7 +89,7 @@ up() {
     go install ./cmd/kubectl-ate )
 
   say "The highway image, the store, the lab STS and store-gate"
-  docker build -q -t "$IMAGE" "$REPO_ROOT/src"
+  docker build -q ${DOCKER_BUILD_FLAGS:-} -t "$IMAGE" "$REPO_ROOT/src"
   kind load docker-image "$IMAGE" --name "$(kind get clusters | head -1)"
   kubectl create ns "$NS" --dry-run=client -o yaml | kubectl apply -f - >/dev/null
   k create secret generic store-token --from-literal=token="store-$(openssl rand -hex 12)" \
