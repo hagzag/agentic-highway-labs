@@ -1,0 +1,16 @@
+apiVersion: ate.dev/v1
+kind: WorkerPool
+metadata:
+  name: highway-runner
+  namespace: highway
+  labels: {workload: highway-runner}
+spec:
+  replicas: 2
+  workerImage: ko://go.ate.dev/substrate/cmd/ateworker-gvisor
+  sandboxClasses:
+  - name: gvisor
+  template:
+    # One runner actor per worker: capacity matches the template's limits (actor-template.yaml)
+    resources:
+      limits: {cpu: "1", memory: 1Gi}
+      requests: {cpu: 250m, memory: 1Gi}

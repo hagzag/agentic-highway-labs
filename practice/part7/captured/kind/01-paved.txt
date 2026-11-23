@@ -1,0 +1,5 @@
+
+[1;36m==> PAVED: no EgressPolicy yet. Part 4's exfil from inside a gVisor actor[0m
+env_store_token=False
+read_token=FileNotFoundError
+exfil=ConnectError

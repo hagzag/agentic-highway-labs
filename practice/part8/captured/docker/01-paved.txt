@@ -1,0 +1,13 @@
+
+[1;36m==> PAVED: Part 4's exfil in an OpenShell sandbox (store provider attached)[0m
+
+Created sandbox: highway
+
+  [0.0s] Requesting compute...
+[0.0s] Sandbox allocated
+[0.0s] Pulling image highway-sandbox:dev
+[0.3s] Image already present
+[1.2s] Starting sandbox Container created
+env STORE_TOKEN=openshell:resolve:env:v16036625205767672614_STORE_TOKEN
+read_token=FileNotFoundError
+exfil=URLError [Errno 13] Permission denied

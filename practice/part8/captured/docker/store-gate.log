@@ -1,0 +1,5 @@
+20:20:45 egress-gateway starting port=8090 permits=True caller_from=mesh routes=highway-store:8000 opa=http://highway-opa:8181/v1/data/highway/egress/decision
+20:21:50 egress=INJECT method=GET host=highway-store:8000 path=/store/v1/buckets caller=- credential=store-token sub=tester act='executor-agent via planner-agent' task_id=72
+20:21:50 egress=DENY method=DELETE host=highway-store:8000 path=/store/v1/buckets/prod-archive caller=- sub=tester act='executor-agent via planner-agent' task_id=72 reason='prod-archive is under retention lock; scope buckets:delete not in permit'
+20:21:50 egress=INJECT method=GET host=highway-store:8000 path=/store/v1/buckets caller=- credential=store-token sub=ops-admin act='executor-agent via planner-agent' task_id=72
+20:21:50 egress=DENY method=DELETE host=highway-store:8000 path=/store/v1/buckets/prod-archive caller=- sub=ops-admin act='executor-agent via planner-agent' task_id=72 reason='prod-archive is under retention lock'

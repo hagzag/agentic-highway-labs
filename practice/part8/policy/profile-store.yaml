@@ -1,0 +1,19 @@
+# OpenShell provider profile for the lab store (checked against openshell 0.1.9:
+# `openshell profile lint` rejects bad auth_style/header_name but ignores unknown keys).
+# The sandbox sees STORE_TOKEN as a placeholder; the proxy replaces it with the real token
+# in the Authorization header, and only for requests to these endpoints.
+id: highway-store
+display_name: Highway store API (lab)
+credentials:
+  - name: STORE_TOKEN
+    env_vars: [STORE_TOKEN]
+    auth_style: bearer
+    header_name: Authorization
+endpoints:
+  - host: host.openshell.internal
+    port: 8000
+    protocol: rest
+    enforcement: enforce
+    access: full
+binaries:
+  - path: /usr/local/bin/python3*

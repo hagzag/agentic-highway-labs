@@ -8,6 +8,8 @@ vars:
   P4: ./practice/part4/run.sh
   P5: ./practice/part5/run.sh
   P6: ./practice/part6/run.sh
+  P7: bash ./practice/part7/run.sh   # via bash: an edit that drops the +x bit cannot break it
+  P8: ./practice/part8/run.sh
 
 tasks:
   default:
@@ -98,3 +100,26 @@ tasks:
   part6:capture: {desc: "run Part 6 and save output to practice/part6/captured/k3d", cmds: ["{{.P6}} capture"]}
   part6:doctor:  {desc: "Part 6 diagnostics: pods, netpol, egress gateway env and decisions", cmds: ["{{.P6}} doctor"]}
   part6:cleanup: {desc: "delete the egress gateway, store credential and policy, then Part 5", cmds: ["./practice/part6/cleanup.sh"]}
+
+  # --- Part 7: Agent Substrate (kind on Linux; not yet captured) ------------
+  part7:up:      {desc: "kind + Agent Substrate + store + lab STS + store-gate + the runner as a gVisor actor", cmds: ["{{.P7}} up"]}
+  part7:paved:   {desc: "no EgressPolicy: Part 4's exfil from inside an actor", cmds: ["{{.P7}} paved"]}
+  part7:break:   {desc: "BREAK: credentialUri injection; the cleanup script deletes prod-archive through Substrate", cmds: ["{{.P7}} break"]}
+  part7:fix:     {desc: "FIX: actorJwt to store-gate; the permit check denies the delete", cmds: ["{{.P7}} fix"]}
+  part7:all:     {desc: "run Part 7 end to end", cmds: ["{{.P7}} all"]}
+  part7:capture: {desc: "run Part 7 and save output to practice/part7/captured/kind", cmds: ["{{.P7}} capture"]}
+  part7:doctor:  {desc: "Part 7 diagnostics: Substrate pods, actor, egress policy, denials", cmds: ["{{.P7}} doctor"]}
+  part7:down:    {desc: "delete the kind cluster", cmds: ["{{.P7}} down"]}
+  part7:vm-shell: {desc: "macOS: open a shell in Part 7's Lima VM (creates it if needed)", cmds: ["{{.P7}} vm-shell"]}
+  part7:vm-down:  {desc: "macOS: delete Part 7's Lima VM", cmds: ["{{.P7}} vm-down"]}
+
+  # --- Part 8: OpenShell (Docker, runs on macOS; not yet captured) ----------
+  part8:up:      {desc: "OpenShell CLI + store, lab STS, store-gate, OPA containers + the store provider", cmds: ["{{.P8}} up"]}
+  part8:paved:   {desc: "Part 4's exfil in an OpenShell sandbox: placeholder only, no route out", cmds: ["{{.P8}} paved"]}
+  part8:break:   {desc: "BREAK: provider injects the store token; the cleanup script deletes prod-archive", cmds: ["{{.P8}} break"]}
+  part8:l7:      {desc: "FIX A: OpenShell L7 rules deny DELETE prod-archive (static, per sandbox)", cmds: ["{{.P8}} l7"]}
+  part8:prove:   {desc: "openshell-prover: candidate policies vs a read-only boundary", cmds: ["{{.P8}} prove"]}
+  part8:gate:    {desc: "FIX B: sandbox reaches only store-gate; the permit check denies the delete", cmds: ["{{.P8}} gate"]}
+  part8:all:     {desc: "run Part 8 end to end", cmds: ["{{.P8}} all"]}
+  part8:capture: {desc: "run Part 8 and save output to practice/part8/captured/docker", cmds: ["{{.P8}} capture"]}
+  part8:down:    {desc: "delete the sandbox, containers and network", cmds: ["{{.P8}} down"]}

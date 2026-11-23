@@ -1,6 +1,9 @@
-"""Local stand-in for the Part 3 STS (local.sh only): serves a JWKS and mints permits.
-Same claims shape as the real STS (sub, nested act, scope, task_id, jti, 120s TTL)."""
+"""Lab stand-in for the Part 3 STS: serves a JWKS and mints permits on GET /mint.
+Used where Keycloak + SPIRE aren't installed (Part 6 local.sh, Part 7 on kind, Part 8).
+Same claims shape as the real STS (sub, nested act, scope, task_id, jti, 120s TTL).
+NEVER a real STS: anyone who can reach /mint gets a permit."""
 import json
+import os
 import time
 import uuid
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -22,10 +25,20 @@ def mint(scope: str, sub: str) -> str:
         "act": {"sub": f"{TD}/executor-agent", "act": {"sub": f"{TD}/planner-agent"}}}, KEY)
 
 
+def mint_actor(sub: str, aud: str) -> str:
+    """Stand-in for an Agent Substrate actor JWT (Part 7 local test)."""
+    now = int(time.time())
+    return jwt.encode({"alg": "ES256", "kid": "local-sts"},
+                      {"iss": "local-ate-idp", "aud": aud, "sub": sub, "iat": now, "exp": now + 300}, KEY)
+
+
 class H(BaseHTTPRequestHandler):
     def do_GET(self):
         u = urlparse(self.path)
-        if u.path == "/mint":
+        if u.path == "/mint-actor":
+            q = parse_qs(u.query)
+            body = mint_actor(q["sub"][0], q.get("aud", ["store-gate"])[0]).encode()
+        elif u.path == "/mint":
             q = parse_qs(u.query)
             body = mint(q["scope"][0], q.get("sub", ["tester"])[0]).encode()
         else:
@@ -38,4 +51,4 @@ class H(BaseHTTPRequestHandler):
         pass
 
 
-HTTPServer(("127.0.0.1", 8099), H).serve_forever()
+HTTPServer((os.environ.get("HOST", "127.0.0.1"), int(os.environ.get("PORT", "8099"))), H).serve_forever()

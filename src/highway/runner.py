@@ -34,18 +34,19 @@ _CALL_PERMIT = ""
 def egress(method: str, url: str, body: bytes | None = None) -> str:
     """Part 6: the script's only road out. Goes through the egress gateway, which
     adds the credential the script never holds. "placeholder" is all it can send.
+    Parts 7-8: with EGRESS_URL unset the call goes straight to `url`, and the sandbox
+    runtime's own egress gateway does the swap.
 
         egress("DELETE", "http://mcp-tools:8000/store/v1/buckets/prod-archive")
     """
-    if not config.EGRESS_URL:
-        return "no egress gateway (EGRESS_URL unset)"
-    target = url.split("://", 1)[-1]
     headers = {"authorization": "placeholder"}
     if _CALL_PERMIT:
         headers["x-highway-permit"] = _CALL_PERMIT
+    # EGRESS_URL set: an explicit gateway (Part 6). Unset: call the URL directly and let a
+    # transparent egress gateway (Agent Substrate, OpenShell) swap the placeholder (Parts 7-8).
+    dest = f"{config.EGRESS_URL.rstrip('/')}/{url.split('://', 1)[-1]}" if config.EGRESS_URL else url
     try:
-        r = httpx.request(method, f"{config.EGRESS_URL.rstrip('/')}/{target}", content=body,
-                          headers=headers, timeout=10)
+        r = httpx.request(method, dest, content=body, headers=headers, timeout=10)
         return f"{r.status_code} {r.text.strip()[:160]}"
     except Exception as e:  # noqa: BLE001
         return type(e).__name__

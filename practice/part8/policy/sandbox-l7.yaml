@@ -1,0 +1,23 @@
+# Fix A, OpenShell-native: L7 rules. Reads allowed; deleting the retention-locked bucket denied.
+# Static: the same answer for every task and every human, and it lives per sandbox.
+version: 1
+filesystem_policy:
+  include_workdir: true
+  read_only: [/usr, /lib, /etc, /app]
+  read_write: [/tmp]
+landlock: {compatibility: best_effort}
+network_policies:
+  highway_store:
+    name: highway_store
+    endpoints:
+      - host: host.openshell.internal
+        port: 8000
+        protocol: rest
+        enforcement: enforce
+        rules:
+          - allow: {method: GET, path: /store/v1/buckets}
+          - allow: {method: DELETE, path: "/store/v1/buckets/*"}
+        deny_rules:
+          - {method: DELETE, path: /store/v1/buckets/prod-archive}
+    binaries:
+      - path: /usr/local/bin/python3*
